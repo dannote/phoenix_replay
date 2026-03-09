@@ -3,7 +3,7 @@ defmodule PhoenixReplay.SanitizerTest do
 
   alias PhoenixReplay.Sanitizer
 
-  test "sanitize_assigns strips internal keys" do
+  test "sanitize_assigns strips internal keys but keeps live_action" do
     assigns = %{
       __changed__: %{count: true},
       flash: %{},
@@ -16,7 +16,7 @@ defmodule PhoenixReplay.SanitizerTest do
 
     refute Map.has_key?(result, :__changed__)
     refute Map.has_key?(result, :flash)
-    refute Map.has_key?(result, :live_action)
+    assert result.live_action == :index
     assert result.count == 42
     assert result.user == "Dan"
   end
@@ -39,12 +39,12 @@ defmodule PhoenixReplay.SanitizerTest do
   end
 
   test "sanitize_delta returns only changed non-internal keys" do
-    changed = %{count: true, __changed__: true, flash: true}
-    assigns = %{count: 5, __changed__: %{count: true}, flash: %{}, name: "Dan"}
+    changed = %{count: true, __changed__: true, flash: true, live_action: true}
+    assigns = %{count: 5, __changed__: %{count: true}, flash: %{}, live_action: :edit, name: "Dan"}
 
     result = Sanitizer.sanitize_delta(changed, assigns)
 
-    assert result == %{count: 5}
+    assert result == %{count: 5, live_action: :edit}
   end
 
   test "sanitize_delta returns empty map when only internal keys changed" do

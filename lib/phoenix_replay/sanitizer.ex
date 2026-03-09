@@ -14,7 +14,6 @@ defmodule PhoenixReplay.Sanitizer do
   @internal_keys [
     :__changed__,
     :flash,
-    :live_action,
     :uploads,
     :streams
   ]

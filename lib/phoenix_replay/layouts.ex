@@ -1,0 +1,92 @@
+defmodule PhoenixReplay.Layouts do
+  @moduledoc false
+  use Phoenix.Component
+
+  def frame(assigns) do
+    ~H"""
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+        <link rel="stylesheet" href="/assets/css/app.css" />
+        <style>
+          body { margin: 0; pointer-events: none; user-select: none; }
+        </style>
+        <script defer type="text/javascript" src="/assets/js/app.js">
+        </script>
+      </head>
+      <body>
+        {@inner_content}
+      </body>
+    </html>
+    """
+  end
+
+  def root(assigns) do
+    ~H"""
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
+        <title>{assigns[:page_title] || "PhoenixReplay"}</title>
+        <style>
+          <%= PhoenixReplay.Layouts.css() %>
+        </style>
+        <script defer type="text/javascript" src="/assets/js/app.js">
+        </script>
+      </head>
+      <body style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f5f5f5; color:#1a1a1a;">
+        {@inner_content}
+      </body>
+    </html>
+    """
+  end
+
+  def css do
+    """
+    *, *::before, *::after { box-sizing: border-box; }
+    a { color: #4f46e5; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .rp-container { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; }
+    .rp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+    .rp-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+    .rp-card { background: #fff; border-radius: 8px; border: 1px solid #e5e5e5; margin-bottom: 0.75rem; transition: box-shadow 0.15s; }
+    .rp-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .rp-card-body { padding: 1rem 1.25rem; }
+    .rp-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .rp-badge-live { background: #dcfce7; color: #166534; }
+    .rp-badge-done { background: #e5e5e5; color: #525252; }
+    .rp-muted { color: #737373; }
+    .rp-mono { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; }
+    .rp-btn { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.375rem 0.75rem; border-radius: 6px; border: 1px solid #d4d4d4; background: #fff; cursor: pointer; font-size: 0.875rem; }
+    .rp-btn:hover { background: #f5f5f5; }
+    .rp-btn:disabled { opacity: 0.4; cursor: default; }
+    .rp-btn-primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+    .rp-btn-primary:hover { background: #4338ca; }
+    .rp-btn-warning { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+    .rp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 768px) { .rp-grid { grid-template-columns: 1fr; } }
+    .rp-controls { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; }
+    .rp-range { flex: 1; }
+    .rp-timeline { max-height: 500px; overflow-y: auto; }
+    .rp-timeline-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem; border: none; background: none; width: 100%; text-align: left; }
+    .rp-timeline-item:hover { background: #f0f0f0; }
+    .rp-timeline-item.active { background: #4f46e5; color: #fff; }
+    .rp-timeline-item.future { opacity: 0.35; }
+    .rp-pre { background: #f0f0f0; border-radius: 6px; padding: 0.75rem; font-size: 0.8125rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; margin: 0; max-height: 320px; overflow-y: auto; }
+    .rp-empty { text-align: center; padding: 4rem 1rem; color: #a3a3a3; }
+    .rp-empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .rp-speed-menu { position: relative; display: inline-block; }
+    .rp-speed-menu ul { display: none; position: absolute; bottom: 100%; right: 0; background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 0.25rem; margin: 0; list-style: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .rp-speed-menu:hover ul { display: block; }
+    .rp-speed-menu li { padding: 0.25rem 0.75rem; cursor: pointer; border-radius: 4px; font-size: 0.875rem; white-space: nowrap; }
+    .rp-speed-menu li:hover { background: #f0f0f0; }
+    .rp-dot-live { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: rp-pulse 2s infinite; }
+    @keyframes rp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    """
+  end
+end

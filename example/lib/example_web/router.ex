@@ -1,5 +1,6 @@
 defmodule ExampleWeb.Router do
   use ExampleWeb, :router
+  import PhoenixReplay.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -18,10 +19,10 @@ defmodule ExampleWeb.Router do
       live "/tasks/new", TaskLive.Index, :new
       live "/tasks/:id/edit", TaskLive.Index, :edit
     end
+  end
 
-    live_session :replay do
-      live "/replay", ReplayLive.Index
-      live "/replay/:id", ReplayLive.Show
-    end
+  scope "/" do
+    pipe_through :browser
+    phoenix_replay "/replay"
   end
 end

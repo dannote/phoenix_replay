@@ -1,14 +1,9 @@
 <div class="max-w-2xl mx-auto py-8 px-4">
   <div class="flex items-center justify-between mb-8">
     <h1 class="text-3xl font-bold">Tasks</h1>
-    <div class="flex gap-2">
-      <.link navigate={~p"/replay"} class="btn btn-ghost btn-sm">
-        📹 Recordings
-      </.link>
-      <.link patch={~p"/tasks/new"} class="btn btn-primary btn-sm">
-        + New Task
-      </.link>
-    </div>
+    <.link patch={~p"/tasks/new"} class="btn btn-primary btn-sm">
+      + New Task
+    </.link>
   </div>
 
   <div class="tabs tabs-box mb-6">
