@@ -39,16 +39,146 @@ defmodule PhoenixReplay.Layouts do
         <script defer type="text/javascript" src="/assets/js/app.js">
         </script>
         <script>
-          window.addEventListener("phx:scrub", (e) => {
-            const input = document.querySelector("#scrubber input[type=range]");
-            if (input) input.value = e.detail.ms;
-          });
+          <%= Phoenix.HTML.raw(PhoenixReplay.Layouts.player_js()) %>
         </script>
       </head>
       <body style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f5f5f5; color:#1a1a1a;">
         {@inner_content}
       </body>
     </html>
+    """
+  end
+
+  @doc false
+  def player_js do
+    ~s"""
+    (function() {
+      "use strict";
+
+      /*
+       * DISCRETE EVENT PLAYER
+       *
+       * Server is source of truth for: current_index, playing state, time display, buttons.
+       * JS only drives: playback timer (when to advance to next event) and scrubber position.
+       *
+       * Play = schedule setTimeout chain, each tick sends next index to server.
+       * Server updates current_index, re-renders time/buttons, broadcasts to iframe.
+       * Scrubber has phx-update="ignore" so server can't reset its position.
+       */
+
+      var events = [];
+      var playing = false;
+      var speed = 1;
+      var timerId = null;
+
+      function getEl(id) { return document.getElementById(id); }
+
+      function sendTick(index) {
+        var form = getEl("rp-tick-bridge");
+        if (!form) return;
+        var input = form.querySelector("input[name=index]");
+        if (!input) return;
+        input.value = String(index);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      function sendScrub(index) {
+        var form = getEl("rp-scrub-bridge");
+        if (!form) return;
+        var input = form.querySelector("input[name=index]");
+        if (!input) return;
+        input.value = String(index);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      function sendEnded() {
+        var form = getEl("rp-ended-bridge");
+        if (!form) return;
+        var input = form.querySelector("input[name=ended]");
+        if (!input) return;
+        input.value = "1";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      function stopTimer() {
+        playing = false;
+        if (timerId) { clearTimeout(timerId); timerId = null; }
+      }
+
+      function currentScrubberIndex() {
+        var el = getEl("rp-scrubber");
+        return el ? parseInt(el.value, 10) : 0;
+      }
+
+      function lastIndex() {
+        return Math.max(0, events.length - 1);
+      }
+
+      function scheduleNext(fromIndex) {
+        if (!playing) return;
+        var nextIndex = fromIndex + 1;
+        if (nextIndex > lastIndex()) {
+          stopTimer();
+          sendEnded();
+          return;
+        }
+
+        var delayMs = (events[nextIndex].ms - events[fromIndex].ms) / speed;
+
+        timerId = setTimeout(function() {
+          if (!playing) return;
+
+          var scrubber = getEl("rp-scrubber");
+          if (scrubber) scrubber.value = nextIndex;
+
+          sendTick(nextIndex);
+          scheduleNext(nextIndex);
+        }, delayMs);
+      }
+
+      /* --- Server -> JS events --- */
+
+      window.addEventListener("phx:init", function(e) {
+        events = e.detail.events || [];
+        speed = e.detail.speed || 1;
+        stopTimer();
+      });
+
+      window.addEventListener("phx:play", function(e) {
+        speed = e.detail.speed || 1;
+        var idx = currentScrubberIndex();
+        if (idx >= lastIndex()) {
+          idx = 0;
+          var scrubber = getEl("rp-scrubber");
+          if (scrubber) scrubber.value = 0;
+          sendTick(0);
+        }
+        playing = true;
+        scheduleNext(idx);
+      });
+
+      window.addEventListener("phx:stop", function() {
+        stopTimer();
+      });
+
+      window.addEventListener("phx:speed", function(e) {
+        var idx = currentScrubberIndex();
+        speed = e.detail.speed || 1;
+        if (playing) {
+          if (timerId) { clearTimeout(timerId); timerId = null; }
+          scheduleNext(idx);
+        }
+      });
+
+      /* --- User scrubber interaction --- */
+
+      document.addEventListener("input", function(e) {
+        if (e.target.id === "rp-scrubber") {
+          if (playing) { stopTimer(); }
+          sendScrub(parseInt(e.target.value, 10));
+        }
+      });
+    })();
     """
   end
 
@@ -91,6 +221,14 @@ defmodule PhoenixReplay.Layouts do
     .rp-speed-menu:hover ul { display: block; }
     .rp-speed-menu li { padding: 0.25rem 0.75rem; cursor: pointer; border-radius: 4px; font-size: 0.875rem; white-space: nowrap; }
     .rp-speed-menu li:hover { background: #f0f0f0; }
+    .rp-scrub-wrap { position: relative; height: 20px; }
+    .rp-scrub-marker { position: absolute; top: 5px; width: 8px; height: 10px; margin-left: -4px; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 1; }
+    .rp-scrub-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; margin: 8px 0; cursor: pointer; position: relative; z-index: 2; border-radius: 2px; background: #e5e5e5; }
+    .rp-scrub-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #4f46e5; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .rp-scrub-range::-moz-range-track { height: 4px; background: #e5e5e5; border: none; border-radius: 2px; }
+    .rp-scrub-range::-moz-range-progress { height: 4px; background: #4f46e5; border-radius: 2px; }
+    .rp-scrub-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #4f46e5; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .rp-hidden { display: none !important; }
     .rp-dot-live { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: rp-pulse 2s infinite; }
     @keyframes rp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     """

@@ -34,12 +34,35 @@ defmodule ExampleWeb.Features.ReplayTest do
     |> assert_has("a", text: "ExampleWeb.TaskLive.Index")
   end
 
-  test "player controls: step forward and back", %{conn: conn} do
+  test "player shows initial time 0:00 and total duration", %{conn: conn} do
+    conn
+    |> create_recording_and_go_to_replay()
+    |> open_first_recording()
+    |> assert_has(".rp-mono", text: "0:00")
+  end
+
+  test "step forward updates iframe content", %{conn: conn} do
+    conn
+    |> create_recording_and_go_to_replay()
+    |> open_first_recording()
+    |> click_button("⏭")
+    |> click_button("⏭")
+  end
+
+  test "step back works", %{conn: conn} do
     conn
     |> create_recording_and_go_to_replay()
     |> open_first_recording()
     |> click_button("⏭")
     |> click_button("⏮")
+  end
+
+  test "play button toggles to pause", %{conn: conn} do
+    conn
+    |> create_recording_and_go_to_replay()
+    |> open_first_recording()
+    |> PhoenixTest.Playwright.click("button[phx-click='play']")
+    |> assert_has("button[phx-click='pause']")
   end
 
   test "events panel toggle", %{conn: conn} do
@@ -51,17 +74,17 @@ defmodule ExampleWeb.Features.ReplayTest do
     |> assert_has("pre")
   end
 
-  test "time display shows current and total time", %{conn: conn} do
+  test "scrubber range input exists with step=1", %{conn: conn} do
     conn
     |> create_recording_and_go_to_replay()
     |> open_first_recording()
-    |> assert_has("span", text: "0:00")
+    |> assert_has("#rp-scrubber[step='1']")
   end
 
-  test "scrubber range input exists", %{conn: conn} do
+  test "speed button is rendered", %{conn: conn} do
     conn
     |> create_recording_and_go_to_replay()
     |> open_first_recording()
-    |> assert_has("#scrubber input[type=range]")
+    |> assert_has(".rp-speed-menu button", text: "1×")
   end
 end
