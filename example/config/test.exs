@@ -9,7 +9,16 @@ config :example, Example.Repo,
 config :example, ExampleWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "lDrxv1MMVskqUmho9J3CdnQMSK36KlJA58zgNsuoOGoeA0fsgniUAUrlL2+7NmTx",
-  server: false
+  server: true
+
+config :example, sql_sandbox: true
+
+config :phoenix_test,
+  otp_app: :example,
+  playwright: [timeout: 5_000]
+
+config :example, Example.Repo,
+  pool: Ecto.Adapters.SQL.Sandbox
 
 # Print only warnings and errors during test
 config :logger, level: :warning

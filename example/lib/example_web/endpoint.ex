@@ -35,6 +35,10 @@ defmodule ExampleWeb.Endpoint do
     plug Phoenix.CodeReloader
   end
 
+  if Application.compile_env(:example, :sql_sandbox) do
+    plug Phoenix.Ecto.SQL.Sandbox
+  end
+
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 

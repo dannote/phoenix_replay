@@ -1,109 +1,249 @@
-<div class="max-w-2xl mx-auto py-8 px-4">
-  <div class="flex items-center justify-between mb-8">
-    <h1 class="text-3xl font-bold">Tasks</h1>
-    <.link patch={~p"/tasks/new"} class="btn btn-primary btn-sm">
-      + New Task
+<div class="mx-auto max-w-2xl px-4 py-10">
+  <header class="mb-8 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">Tasks</h1>
+      <p class="mt-1 text-sm text-gray-500">
+        {length(@tasks)} total · {Enum.count(@tasks, & &1.completed)} completed
+      </p>
+    </div>
+    <.link
+      patch={~p"/tasks/new"}
+      class="inline-flex h-9 items-center gap-1.5 rounded-md bg-gray-900 px-3.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+      New Task
     </.link>
-  </div>
+  </header>
 
-  <div class="tabs tabs-box mb-6">
+  <nav class="mb-6 flex gap-1 border-b border-gray-200" aria-label="Filter tasks">
     <button
+      :for={
+        {label, value} <- [
+          {"All", "all"},
+          {"Active", "active"},
+          {"Completed", "done"}
+        ]
+      }
       phx-click="filter"
-      phx-value-filter="all"
-      class={"tab #{if @filter == "all", do: "tab-active"}"}
+      phx-value-filter={value}
+      class={[
+        "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2",
+        if(@filter == value,
+          do: "border-gray-900 text-gray-900",
+          else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+        )
+      ]}
     >
-      All ({length(@tasks)})
+      {label}
+      <span class={[
+        "ml-1.5 rounded-full px-1.5 py-0.5 text-xs tabular-nums",
+        if(@filter == value,
+          do: "bg-gray-900 text-white",
+          else: "bg-gray-100 text-gray-600"
+        )
+      ]}>
+        {filter_count(@tasks, value)}
+      </span>
     </button>
-    <button
-      phx-click="filter"
-      phx-value-filter="active"
-      class={"tab #{if @filter == "active", do: "tab-active"}"}
-    >
-      Active ({@tasks |> Enum.reject(& &1.completed) |> length()})
-    </button>
-    <button
-      phx-click="filter"
-      phx-value-filter="done"
-      class={"tab #{if @filter == "done", do: "tab-active"}"}
-    >
-      Done ({@tasks |> Enum.filter(& &1.completed) |> length()})
-    </button>
-  </div>
+  </nav>
 
-  <div class="space-y-3">
+  <div class="overflow-hidden rounded-lg border border-gray-200">
     <div
-      :for={task <- filtered_tasks(@tasks, @filter)}
-      class={"card bg-base-200 shadow-sm transition-all #{if task.completed, do: "opacity-60"}"}
+      :for={{task, i} <- filtered_tasks(@tasks, @filter) |> Enum.with_index()}
+      class={["flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50", i > 0 && "border-t border-gray-100"]}
     >
-      <div class="card-body p-4 flex-row items-center gap-4">
-        <input
-          type="checkbox"
-          class="checkbox"
-          checked={task.completed}
-          phx-click="toggle"
-          phx-value-id={task.id}
-        />
-        <div class="flex-1">
-          <div class={"font-medium #{if task.completed, do: "line-through"}"}>
-            {task.title}
-          </div>
-          <div :if={task.description} class="text-sm text-base-content/60">
-            {task.description}
-          </div>
-        </div>
-        <span class={"badge badge-sm #{priority_badge(task.priority)}"}>
-          {task.priority}
-        </span>
-        <.link patch={~p"/tasks/#{task.id}/edit"} class="btn btn-ghost btn-xs">
-          Edit
+      <button
+        phx-click="toggle"
+        phx-value-id={task.id}
+        class={[
+          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2",
+          if(task.completed,
+            do: "border-gray-900 bg-gray-900",
+            else: "border-gray-300 bg-white hover:border-gray-400"
+          )
+        ]}
+        aria-label={"Toggle #{task.title}"}
+        aria-pressed={to_string(task.completed)}
+      >
+        <svg
+          :if={task.completed}
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="white"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </button>
+
+      <div class="min-w-0 flex-1">
+        <p class={["text-sm font-medium", task.completed && "text-gray-400 line-through"]}>
+          {task.title}
+        </p>
+        <p :if={task.description} class="mt-0.5 truncate text-xs text-gray-500">
+          {task.description}
+        </p>
+      </div>
+
+      <span class={[
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+        priority_classes(task.priority)
+      ]}>
+        {task.priority}
+      </span>
+
+      <div class="flex items-center gap-0.5">
+        <.link
+          patch={~p"/tasks/#{task.id}/edit"}
+          class="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+          aria-label={"Edit #{task.title}"}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          </svg>
         </.link>
-        <button phx-click="delete" phx-value-id={task.id} class="btn btn-ghost btn-xs text-error">
-          ✕
+        <button
+          phx-click="delete"
+          phx-value-id={task.id}
+          class="rounded p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          aria-label={"Delete #{task.title}"}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+          </svg>
         </button>
       </div>
     </div>
+
+    <div
+      :if={filtered_tasks(@tasks, @filter) == []}
+      class="px-4 py-16 text-center text-sm text-gray-400"
+    >
+      No tasks found
+    </div>
   </div>
 
-  <div :if={filtered_tasks(@tasks, @filter) == []} class="text-center py-12 text-base-content/40">
-    No tasks found
-  </div>
-
-  <%!-- Modal for new/edit --%>
-  <div :if={@live_action in [:new, :edit]} class="modal modal-open">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg mb-4">
+  <%!-- Modal --%>
+  <div
+    :if={@live_action in [:new, :edit]}
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    role="dialog"
+    aria-modal="true"
+    aria-label={if @live_action == :new, do: "New Task", else: "Edit Task"}
+  >
+    <.link patch={~p"/"} class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" aria-hidden="true">
+      <span class="sr-only">Close</span>
+    </.link>
+    <div class="relative w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+      <h2 class="text-lg font-semibold">
         {if @live_action == :new, do: "New Task", else: "Edit Task"}
-      </h3>
-      <.form for={@form} phx-submit="save" phx-change="validate" class="space-y-4">
+      </h2>
+      <p class="mt-1 text-sm text-gray-500">
+        {if @live_action == :new, do: "Add a task to your list.", else: "Update task details."}
+      </p>
+
+      <.form for={@form} phx-submit="save" phx-change="validate" class="mt-5 space-y-4">
         <input type="hidden" name="task_id" value={@form[:id].value} />
-        <div class="form-control">
-          <label class="label"><span class="label-text">Title</span></label>
+
+        <div>
+          <label for="title" class="mb-1.5 block text-sm font-medium text-gray-700">Title</label>
           <input
             type="text"
+            id="title"
             name="title"
             value={@form[:title].value}
-            class="input input-bordered"
             required
+            autocomplete="off"
+            placeholder="e.g. Review PR #42…"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-gray-400 hover:border-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
           />
         </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">Description</span></label>
-          <textarea name="description" class="textarea textarea-bordered"><%= @form[:description].value %></textarea>
+
+        <div>
+          <label for="description" class="mb-1.5 block text-sm font-medium text-gray-700">
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            rows="3"
+            autocomplete="off"
+            placeholder="Optional details…"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-gray-400 hover:border-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          ><%= @form[:description].value %></textarea>
         </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">Priority</span></label>
-          <select name="priority" class="select select-bordered">
+
+        <div>
+          <label for="priority" class="mb-1.5 block text-sm font-medium text-gray-700">
+            Priority
+          </label>
+          <select
+            id="priority"
+            name="priority"
+            class="block w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 pr-8 text-sm shadow-sm transition-colors hover:border-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          >
             <option value="low" selected={@form[:priority].value == "low"}>Low</option>
             <option value="medium" selected={@form[:priority].value == "medium"}>Medium</option>
             <option value="high" selected={@form[:priority].value == "high"}>High</option>
           </select>
         </div>
-        <div class="modal-action">
-          <.link patch={~p"/"} class="btn">Cancel</.link>
-          <button type="submit" class="btn btn-primary">Save</button>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <.link
+            patch={~p"/"}
+            class="inline-flex h-9 items-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+          >
+            Cancel
+          </.link>
+          <button
+            type="submit"
+            class="inline-flex h-9 items-center rounded-md bg-gray-900 px-4 text-sm font-medium text-white transition-colors hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+          >
+            {if @live_action == :new, do: "Create Task", else: "Save Changes"}
+          </button>
         </div>
       </.form>
     </div>
-    <.link patch={~p"/"} class="modal-backdrop"><span class="sr-only">Close</span></.link>
   </div>
 </div>

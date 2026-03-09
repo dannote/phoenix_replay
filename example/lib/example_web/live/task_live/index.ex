@@ -87,7 +87,11 @@ defmodule ExampleWeb.TaskLive.Index do
   defp filtered_tasks(tasks, "active"), do: Enum.reject(tasks, & &1.completed)
   defp filtered_tasks(tasks, "done"), do: Enum.filter(tasks, & &1.completed)
 
-  defp priority_badge("high"), do: "badge-error"
-  defp priority_badge("medium"), do: "badge-warning"
-  defp priority_badge("low"), do: "badge-success"
+  defp filter_count(tasks, "all"), do: length(tasks)
+  defp filter_count(tasks, "active"), do: Enum.count(tasks, &(!&1.completed))
+  defp filter_count(tasks, "done"), do: Enum.count(tasks, & &1.completed)
+
+  defp priority_classes("high"), do: "bg-red-50 text-red-700 ring-red-600/20"
+  defp priority_classes("medium"), do: "bg-amber-50 text-amber-700 ring-amber-600/20"
+  defp priority_classes("low"), do: "bg-green-50 text-green-700 ring-green-600/20"
 end
