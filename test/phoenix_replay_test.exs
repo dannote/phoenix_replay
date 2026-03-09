@@ -1,8 +1,7 @@
 defmodule PhoenixReplayTest do
-  use ExUnit.Case
-  doctest PhoenixReplay
+  use ExUnit.Case, async: true
 
-  test "greets the world" do
-    assert PhoenixReplay.hello() == :world
+  test "module exists" do
+    assert is_list(PhoenixReplay.module_info(:attributes))
   end
 end
