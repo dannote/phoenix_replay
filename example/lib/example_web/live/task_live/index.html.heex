@@ -1,0 +1,114 @@
+<div class="max-w-2xl mx-auto py-8 px-4">
+  <div class="flex items-center justify-between mb-8">
+    <h1 class="text-3xl font-bold">Tasks</h1>
+    <div class="flex gap-2">
+      <.link navigate={~p"/replay"} class="btn btn-ghost btn-sm">
+        📹 Recordings
+      </.link>
+      <.link patch={~p"/tasks/new"} class="btn btn-primary btn-sm">
+        + New Task
+      </.link>
+    </div>
+  </div>
+
+  <div class="tabs tabs-box mb-6">
+    <button
+      phx-click="filter"
+      phx-value-filter="all"
+      class={"tab #{if @filter == "all", do: "tab-active"}"}
+    >
+      All ({length(@tasks)})
+    </button>
+    <button
+      phx-click="filter"
+      phx-value-filter="active"
+      class={"tab #{if @filter == "active", do: "tab-active"}"}
+    >
+      Active ({@tasks |> Enum.reject(& &1.completed) |> length()})
+    </button>
+    <button
+      phx-click="filter"
+      phx-value-filter="done"
+      class={"tab #{if @filter == "done", do: "tab-active"}"}
+    >
+      Done ({@tasks |> Enum.filter(& &1.completed) |> length()})
+    </button>
+  </div>
+
+  <div class="space-y-3">
+    <div
+      :for={task <- filtered_tasks(@tasks, @filter)}
+      class={"card bg-base-200 shadow-sm transition-all #{if task.completed, do: "opacity-60"}"}
+    >
+      <div class="card-body p-4 flex-row items-center gap-4">
+        <input
+          type="checkbox"
+          class="checkbox"
+          checked={task.completed}
+          phx-click="toggle"
+          phx-value-id={task.id}
+        />
+        <div class="flex-1">
+          <div class={"font-medium #{if task.completed, do: "line-through"}"}>
+            {task.title}
+          </div>
+          <div :if={task.description} class="text-sm text-base-content/60">
+            {task.description}
+          </div>
+        </div>
+        <span class={"badge badge-sm #{priority_badge(task.priority)}"}>
+          {task.priority}
+        </span>
+        <.link patch={~p"/tasks/#{task.id}/edit"} class="btn btn-ghost btn-xs">
+          Edit
+        </.link>
+        <button phx-click="delete" phx-value-id={task.id} class="btn btn-ghost btn-xs text-error">
+          ✕
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div :if={filtered_tasks(@tasks, @filter) == []} class="text-center py-12 text-base-content/40">
+    No tasks found
+  </div>
+
+  <%!-- Modal for new/edit --%>
+  <div :if={@live_action in [:new, :edit]} class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-4">
+        {if @live_action == :new, do: "New Task", else: "Edit Task"}
+      </h3>
+      <.form for={@form} phx-submit="save" phx-change="validate" class="space-y-4">
+        <input type="hidden" name="task_id" value={@form[:id].value} />
+        <div class="form-control">
+          <label class="label"><span class="label-text">Title</span></label>
+          <input
+            type="text"
+            name="title"
+            value={@form[:title].value}
+            class="input input-bordered"
+            required
+          />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">Description</span></label>
+          <textarea name="description" class="textarea textarea-bordered"><%= @form[:description].value %></textarea>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">Priority</span></label>
+          <select name="priority" class="select select-bordered">
+            <option value="low" selected={@form[:priority].value == "low"}>Low</option>
+            <option value="medium" selected={@form[:priority].value == "medium"}>Medium</option>
+            <option value="high" selected={@form[:priority].value == "high"}>High</option>
+          </select>
+        </div>
+        <div class="modal-action">
+          <.link patch={~p"/"} class="btn">Cancel</.link>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </.form>
+    </div>
+    <.link patch={~p"/"} class="modal-backdrop"><span class="sr-only">Close</span></.link>
+  </div>
+</div>

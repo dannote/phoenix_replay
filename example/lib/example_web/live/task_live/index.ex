@@ -1,0 +1,93 @@
+defmodule ExampleWeb.TaskLive.Index do
+  use ExampleWeb, :live_view
+
+  alias Example.Tasks
+
+  @impl true
+  def mount(_params, _session, socket) do
+    if connected?(socket), do: Tasks.subscribe()
+
+    {:ok,
+     socket
+     |> assign(:page_title, "Tasks")
+     |> assign(:filter, "all")
+     |> assign(:tasks, Tasks.list_tasks())}
+  end
+
+  @impl true
+  def handle_params(params, _url, socket) do
+    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+  end
+
+  defp apply_action(socket, :new, _params) do
+    assign(socket, :form, to_form(%{"title" => "", "description" => "", "priority" => "medium"}))
+  end
+
+  defp apply_action(socket, :edit, %{"id" => id}) do
+    task = Tasks.get_task(id)
+
+    if task do
+      assign(
+        socket,
+        :form,
+        to_form(%{
+          "id" => task.id,
+          "title" => task.title,
+          "description" => task.description || "",
+          "priority" => task.priority
+        })
+      )
+    else
+      push_navigate(socket, to: ~p"/")
+    end
+  end
+
+  defp apply_action(socket, :index, _params) do
+    assign(socket, :form, nil)
+  end
+
+  @impl true
+  def handle_event("toggle", %{"id" => id}, socket) do
+    Tasks.toggle_task(id)
+    {:noreply, socket}
+  end
+
+  def handle_event("delete", %{"id" => id}, socket) do
+    Tasks.delete_task(id)
+    {:noreply, socket}
+  end
+
+  def handle_event("filter", %{"filter" => filter}, socket) do
+    {:noreply, assign(socket, :filter, filter)}
+  end
+
+  def handle_event("save", %{"title" => _} = params, socket) do
+    case socket.assigns.live_action do
+      :new ->
+        Tasks.create_task(params)
+        {:noreply, push_patch(socket, to: ~p"/")}
+
+      :edit ->
+        Tasks.update_task(params["task_id"], params)
+        {:noreply, push_patch(socket, to: ~p"/")}
+    end
+  end
+
+  def handle_event("validate", _params, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({event, _task}, socket)
+      when event in [:task_created, :task_updated, :task_deleted] do
+    {:noreply, assign(socket, :tasks, Tasks.list_tasks())}
+  end
+
+  defp filtered_tasks(tasks, "all"), do: tasks
+  defp filtered_tasks(tasks, "active"), do: Enum.reject(tasks, & &1.completed)
+  defp filtered_tasks(tasks, "done"), do: Enum.filter(tasks, & &1.completed)
+
+  defp priority_badge("high"), do: "badge-error"
+  defp priority_badge("medium"), do: "badge-warning"
+  defp priority_badge("low"), do: "badge-success"
+end
