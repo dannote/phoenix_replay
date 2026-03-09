@@ -18,15 +18,18 @@ defmodule PhoenixReplay.Live.Show do
       end
 
     if recording do
+      duration = total_duration(recording)
+
       {:ok,
        socket
        |> assign(:page_title, "Replay: #{inspect(recording.view)}")
        |> assign(:recording, recording)
        |> assign(:base_path, "")
        |> assign(:current_index, 0)
+       |> assign(:duration, duration)
        |> assign(:playing, false)
        |> assign(:speed, 1)
-       |> assign(:show_inspector, false)}
+       |> assign(:show_events, false)}
     else
       {:ok, push_navigate(socket, to: "/")}
     end
@@ -52,6 +55,12 @@ defmodule PhoenixReplay.Live.Show do
     jump(socket, String.to_integer(index))
   end
 
+  def handle_event("seek", %{"ms" => ms}, socket) do
+    ms = String.to_integer(ms)
+    index = nearest_event_index(socket.assigns.recording.events, ms)
+    jump(socket, index)
+  end
+
   def handle_event("play", _, socket) do
     send(self(), :tick)
     {:noreply, assign(socket, :playing, true)}
@@ -65,8 +74,8 @@ defmodule PhoenixReplay.Live.Show do
     {:noreply, assign(socket, :speed, String.to_integer(speed))}
   end
 
-  def handle_event("toggle_inspector", _, socket) do
-    {:noreply, assign(socket, :show_inspector, !socket.assigns.show_inspector)}
+  def handle_event("toggle_events", _, socket) do
+    {:noreply, assign(socket, :show_events, !socket.assigns.show_events)}
   end
 
   defp jump(socket, index) do
@@ -74,7 +83,12 @@ defmodule PhoenixReplay.Live.Show do
     index = max(0, min(index, max))
 
     broadcast_jump(socket.assigns.recording.id, index)
-    {:noreply, assign(socket, :current_index, index)}
+    current_ms = current_offset(socket.assigns.recording, index)
+
+    {:noreply,
+     socket
+     |> assign(:current_index, index)
+     |> push_event("scrub", %{ms: current_ms})}
   end
 
   defp broadcast_jump(recording_id, index) do
@@ -93,14 +107,19 @@ defmodule PhoenixReplay.Live.Show do
     max = length(recording.events) - 1
 
     if index < max do
-      {current_offset, _, _} = Enum.at(recording.events, index)
-      {next_offset, _, _} = Enum.at(recording.events, index + 1)
-      delay = max(div(next_offset - current_offset, speed), 10)
+      {current_ms, _, _} = Enum.at(recording.events, index)
+      {next_ms, _, _} = Enum.at(recording.events, index + 1)
+      delay = max(div(next_ms - current_ms, speed), 10)
 
       Process.send_after(self(), :tick, delay)
       new_index = index + 1
       broadcast_jump(recording.id, new_index)
-      {:noreply, assign(socket, :current_index, new_index)}
+      new_ms = current_offset(recording, new_index)
+
+      {:noreply,
+       socket
+       |> assign(:current_index, new_index)
+       |> push_event("scrub", %{ms: new_ms})}
     else
       {:noreply, assign(socket, :playing, false)}
     end
@@ -108,8 +127,35 @@ defmodule PhoenixReplay.Live.Show do
 
   def handle_info(_, socket), do: {:noreply, socket}
 
-  defp current_event(recording, index) do
-    Enum.at(recording.events, index)
+  defp current_offset(recording, index) do
+    case Enum.at(recording.events, index) do
+      {ms, _, _} -> ms
+      _ -> 0
+    end
+  end
+
+  defp total_duration(%{events: []}), do: 0
+
+  defp total_duration(%{events: events}) do
+    {ms, _, _} = List.last(events)
+    ms
+  end
+
+  defp nearest_event_index(events, target_ms) do
+    events
+    |> Enum.with_index()
+    |> Enum.min_by(fn {{ms, _, _}, _i} -> abs(ms - target_ms) end)
+    |> elem(1)
+  end
+
+  defp event_markers(_events, duration) when duration <= 0, do: []
+
+  defp event_markers(events, duration) do
+    events
+    |> Enum.with_index()
+    |> Enum.map(fn {{ms, type, _}, i} ->
+      %{index: i, type: type, pct: ms / duration * 100}
+    end)
   end
 
   defp event_icon(:mount), do: "🚀"
@@ -127,17 +173,17 @@ defmodule PhoenixReplay.Live.Show do
   defp event_label({_, :assigns, _}), do: "assigns changed"
   defp event_label({_, type, _}), do: to_string(type)
 
-  defp format_offset(ms) do
-    seconds = div(ms, 1000)
-    millis = rem(ms, 1000)
-    minutes = div(seconds, 60)
-    secs = rem(seconds, 60)
+  defp marker_color(:mount), do: "#4f46e5"
+  defp marker_color(:event), do: "#f59e0b"
+  defp marker_color(:handle_params), do: "#0ea5e9"
+  defp marker_color(:assigns), do: "#a3a3a3"
+  defp marker_color(_), do: "#737373"
 
-    if minutes > 0 do
-      "#{minutes}:#{String.pad_leading("#{secs}", 2, "0")}.#{String.pad_leading("#{millis}", 3, "0")}"
-    else
-      "#{secs}.#{String.pad_leading("#{millis}", 3, "0")}s"
-    end
+  defp format_time(ms) do
+    total_seconds = div(ms, 1000)
+    minutes = div(total_seconds, 60)
+    secs = rem(total_seconds, 60)
+    "#{minutes}:#{String.pad_leading("#{secs}", 2, "0")}"
   end
 
   @impl true
@@ -153,85 +199,96 @@ defmodule PhoenixReplay.Live.Show do
         </p>
       </div>
 
-      <%!-- Playback controls --%>
+      <%!-- Player --%>
       <div class="rp-card" style="margin-bottom:1rem;">
-        <div class="rp-controls">
-          <button phx-click="step_back" class="rp-btn" disabled={@current_index == 0}>⏮</button>
-          <button :if={!@playing} phx-click="play" class="rp-btn rp-btn-primary">▶ Play</button>
-          <button :if={@playing} phx-click="pause" class="rp-btn rp-btn-warning">⏸ Pause</button>
-          <button phx-click="step_forward" class="rp-btn" disabled={@current_index == length(@recording.events) - 1}>⏭</button>
+        <div style="padding:0.75rem 1.25rem;">
+          <%!-- Controls row --%>
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+            <button phx-click="step_back" class="rp-btn" disabled={@current_index == 0} style="padding:0.25rem 0.5rem;">⏮</button>
+            <button :if={!@playing} phx-click="play" class="rp-btn rp-btn-primary" style="padding:0.25rem 0.75rem;">▶</button>
+            <button :if={@playing} phx-click="pause" class="rp-btn rp-btn-warning" style="padding:0.25rem 0.75rem;">⏸</button>
+            <button phx-click="step_forward" class="rp-btn" disabled={@current_index == length(@recording.events) - 1} style="padding:0.25rem 0.5rem;">⏭</button>
 
-          <input
-            type="range"
-            min="0"
-            max={length(@recording.events) - 1}
-            value={@current_index}
-            phx-change="jump"
-            name="index"
-            class="rp-range"
-          />
+            <span class="rp-mono" style="font-size:0.8125rem; margin-left:0.5rem; color:#525252;">
+              {format_time(current_offset(@recording, @current_index))} / {format_time(@duration)}
+            </span>
 
-          <span class="rp-mono" style="font-size:0.875rem; min-width:60px; text-align:right;">
-            {@current_index + 1}/{length(@recording.events)}
-          </span>
+            <span style="flex:1;"></span>
 
-          <div class="rp-speed-menu">
-            <button class="rp-btn">{@speed}x</button>
-            <ul>
-              <li :for={s <- [1, 2, 5, 10]} phx-click="speed" phx-value-speed={s}>{s}x</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 280px; gap:1rem;">
-        <%!-- Visual replay iframe --%>
-        <div class="rp-card" style="overflow:hidden;">
-          <iframe
-            id="replay-frame"
-            src={"#{@base_path}/#{@recording.id}/frame"}
-            style="width:100%; height:600px; border:none; display:block;"
-          />
-        </div>
-
-        <%!-- Event timeline sidebar --%>
-        <div class="rp-card">
-          <div class="rp-card-body" style="padding:0.75rem;">
-            <h2 style="font-size:0.875rem; font-weight:600; margin:0 0 0.5rem; padding:0 0.5rem;">Timeline</h2>
-            <div class="rp-timeline">
-              <button
-                :for={{event, i} <- Enum.with_index(@recording.events)}
-                phx-click="jump"
-                phx-value-index={i}
-                class={"rp-timeline-item #{if i == @current_index, do: "active"} #{if i > @current_index, do: "future"}"}
-                style="font-size:0.8125rem; padding:0.375rem 0.5rem;"
-              >
-                <span>{event_icon(elem(event, 1))}</span>
-                <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                  {event_label(event)}
-                </span>
-                <span class="rp-mono" style={"font-size:0.6875rem; #{if i == @current_index, do: "opacity:0.7;", else: "color:#a3a3a3;"}"}>
-                  {format_offset(elem(event, 0))}
-                </span>
-              </button>
+            <div class="rp-speed-menu">
+              <button class="rp-btn" style="padding:0.25rem 0.5rem; font-size:0.8125rem;">{@speed}×</button>
+              <ul>
+                <li :for={s <- [1, 2, 5, 10]} phx-click="speed" phx-value-speed={s}>{s}×</li>
+              </ul>
             </div>
           </div>
+
+          <%!-- Scrubber with event markers --%>
+          <div style="position:relative; height:28px;">
+            <%!-- Track background --%>
+            <div style="position:absolute; top:12px; left:0; right:0; height:4px; background:#e5e5e5; border-radius:2px;"></div>
+            <%!-- Progress fill --%>
+            <div style={"position:absolute; top:12px; left:0; height:4px; background:#4f46e5; border-radius:2px; width:#{if @duration > 0, do: current_offset(@recording, @current_index) / @duration * 100, else: 0}%;"}></div>
+            <%!-- Event markers --%>
+            <div
+              :for={m <- event_markers(@recording.events, @duration)}
+              phx-click="jump"
+              phx-value-index={m.index}
+              style={"position:absolute; left:#{m.pct}%; top:8px; width:8px; height:12px; margin-left:-4px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:2;"}
+              title={event_label(Enum.at(@recording.events, m.index))}
+            >
+              <div style={"width:#{if m.type in [:event, :mount, :handle_params], do: 6, else: 3}px; height:#{if m.type in [:event, :mount, :handle_params], do: 6, else: 3}px; border-radius:50%; background:#{marker_color(m.type)};"}></div>
+            </div>
+            <%!-- Range input --%>
+            <form id="scrubber" phx-change="seek" phx-update="ignore" style="position:absolute; inset:0; margin:0;">
+              <input
+                type="range"
+                min="0"
+                max={@duration}
+                value="0"
+                name="ms"
+                style="width:100%; height:28px; opacity:0; cursor:pointer; margin:0;"
+              />
+            </form>
+          </div>
         </div>
       </div>
 
-      <%!-- Collapsible inspector --%>
-      <div style="margin-top:1rem;">
-        <button phx-click="toggle_inspector" class="rp-btn" style="font-size:0.8125rem;">
-          {if @show_inspector, do: "▼", else: "▶"} Inspector
+      <%!-- Iframe --%>
+      <div class="rp-card" style="overflow:hidden; margin-bottom:1rem;">
+        <iframe
+          id="replay-frame"
+          src={"#{@base_path}/#{@recording.id}/frame"}
+          style="width:100%; height:600px; border:none; display:block;"
+        />
+      </div>
+
+      <%!-- Events panel --%>
+      <div>
+        <button phx-click="toggle_events" class="rp-btn" style="font-size:0.8125rem;">
+          {if @show_events, do: "▼", else: "▶"} Events ({length(@recording.events)})
         </button>
 
-        <div :if={@show_inspector} class="rp-grid" style="margin-top:0.75rem;">
+        <div :if={@show_events} style="margin-top:0.75rem; display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
           <div class="rp-card">
-            <div class="rp-card-body">
-              <h2 style="font-size:0.875rem; font-weight:600; margin:0 0 0.5rem;">
-                {event_icon(elem(current_event(@recording, @current_index), 1))} Current Event
-              </h2>
-              <pre class="rp-pre"><%= inspect(current_event(@recording, @current_index), pretty: true, limit: 50) %></pre>
+            <div class="rp-card-body" style="padding:0.75rem;">
+              <div class="rp-timeline">
+                <button
+                  :for={{event, i} <- Enum.with_index(@recording.events)}
+                  phx-click="jump"
+                  phx-value-index={i}
+                  class={"rp-timeline-item #{if i == @current_index, do: "active"} #{if i > @current_index, do: "future"}"}
+                  style="font-size:0.8125rem; padding:0.25rem 0.5rem;"
+                >
+                  <span>{event_icon(elem(event, 1))}</span>
+                  <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    {event_label(event)}
+                  </span>
+                  <span class="rp-mono" style={"font-size:0.6875rem; #{if i == @current_index, do: "opacity:0.7;", else: "color:#a3a3a3;"}"}>
+                    {format_time(elem(event, 0))}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 

@@ -1,13 +1,10 @@
 defmodule ExampleWeb.Features.TaskLiveTest do
-  use PhoenixTest.Playwright.Case, async: true
+  use PhoenixTest.Playwright.Case, async: false
   use ExampleWeb, :verified_routes
 
   alias Example.{Repo, Tasks.Task}
 
   setup do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Repo, shared: true)
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
-
     Repo.insert!(%Task{
       title: "Review PR #42",
       description: "Check the auth flow",

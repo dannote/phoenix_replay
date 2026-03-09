@@ -13,6 +13,13 @@ config :example, ExampleWeb.Endpoint,
 
 config :example, sql_sandbox: true
 
+config :phoenix_replay,
+  storage: PhoenixReplay.Storage.File,
+  storage_opts: [
+    path: Path.join(System.tmp_dir!(), "phoenix_replay_example_test"),
+    format: :etf
+  ]
+
 config :phoenix_test,
   otp_app: :example,
   playwright: [timeout: 5_000]

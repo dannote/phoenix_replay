@@ -13,22 +13,39 @@ defmodule PhoenixReplay do
         live "/dashboard", DashboardLive
       end
 
-  Or attach it in a specific LiveView:
-
-      def mount(_params, _session, socket) do
-        {:ok, PhoenixReplay.Recorder.attach(socket)}
-      end
-
   ## Configuration
 
       config :phoenix_replay,
-        # Maximum events per recording (prevents runaway sessions)
         max_events: 10_000,
-        # How long to keep recordings in ETS before flushing
-        flush_interval_ms: 5_000,
-        # Filter assigns before recording
         sanitizer: PhoenixReplay.Sanitizer,
-        # Storage backend
-        storage: PhoenixReplay.Storage.ETS
+        storage: PhoenixReplay.Storage.File,
+        storage_opts: [
+          path: "priv/replay_recordings",
+          format: :etf  # or :json
+        ]
+
+  ## Storage backends
+
+    * `PhoenixReplay.Storage.File` — writes one file per recording to disk (default)
+    * `PhoenixReplay.Storage.Ecto` — stores recordings in a database table
+      (requires `ecto_sql` in the host app)
+
+  Both backends support `:etf` (Erlang Term Format) and `:json` serialization.
+  ETF is the default — fast, compact, preserves all Elixir types. JSON is
+  portable and human-readable but lossy for atoms, tuples, and structs.
+
+  ### File backend
+
+      config :phoenix_replay,
+        storage: PhoenixReplay.Storage.File,
+        storage_opts: [path: "priv/replay_recordings", format: :etf]
+
+  ### Ecto backend
+
+      config :phoenix_replay,
+        storage: PhoenixReplay.Storage.Ecto,
+        storage_opts: [repo: MyApp.Repo, format: :etf]
+
+  See `PhoenixReplay.Storage.Ecto` for the required migration.
   """
 end

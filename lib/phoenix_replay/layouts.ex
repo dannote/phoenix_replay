@@ -38,6 +38,12 @@ defmodule PhoenixReplay.Layouts do
         </style>
         <script defer type="text/javascript" src="/assets/js/app.js">
         </script>
+        <script>
+          window.addEventListener("phx:scrub", (e) => {
+            const input = document.querySelector("#scrubber input[type=range]");
+            if (input) input.value = e.detail.ms;
+          });
+        </script>
       </head>
       <body style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f5f5f5; color:#1a1a1a;">
         {@inner_content}

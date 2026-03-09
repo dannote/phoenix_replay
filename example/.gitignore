@@ -40,3 +40,6 @@ npm-debug.log
 *.db-shm
 *.db-wal
 
+# Replay recordings
+/priv/replay_recordings/
+
