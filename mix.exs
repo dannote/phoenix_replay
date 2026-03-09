@@ -15,7 +15,9 @@ defmodule PhoenixReplay.MixProject do
       package: package(),
       docs: docs(),
       name: "PhoenixReplay",
-      description: "Session recording and replay for Phoenix LiveView"
+      description: "Session recording and replay for Phoenix LiveView",
+      dialyzer: [plt_add_apps: [:mix]],
+      aliases: aliases()
     ]
   end
 
@@ -32,9 +34,13 @@ defmodule PhoenixReplay.MixProject do
   defp deps do
     [
       {:phoenix_live_view, "~> 1.0"},
-      {:jason, "~> 1.0", only: :test},
+      {:jason, "~> 1.0", only: [:dev, :test]},
       {:lazy_html, ">= 0.1.0", only: :test},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_dna, "~> 1.1", only: [:dev, :test], runtime: false},
+      {:ex_slop, "~> 0.2.0", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -50,6 +56,19 @@ defmodule PhoenixReplay.MixProject do
       main: "PhoenixReplay",
       source_url: @source_url,
       source_ref: "v#{@version}"
+    ]
+  end
+
+  defp aliases do
+    [
+      ci: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "credo --strict",
+        "ex_dna",
+        "dialyzer",
+        "deps.unlock --check-unused"
+      ]
     ]
   end
 end

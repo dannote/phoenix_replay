@@ -11,7 +11,7 @@ defmodule Example.Application do
       ExampleWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:example, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Example.PubSub},
-      Example.Tasks,
+      Example.Repo,
       ExampleWeb.Endpoint
     ]
 

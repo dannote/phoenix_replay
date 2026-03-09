@@ -1,13 +1,15 @@
 defmodule PhoenixReplay.Live.Show do
   use Phoenix.LiveView
 
-  alias PhoenixReplay.Store
+  alias PhoenixReplay.{Recording, Store}
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     recording =
       case Store.get_recording(id) do
-        {:ok, rec} -> rec
+        {:ok, rec} ->
+          rec
+
         :error ->
           case Store.get_active(id) do
             {:ok, rec} -> rec
@@ -76,7 +78,11 @@ defmodule PhoenixReplay.Live.Show do
   end
 
   defp broadcast_jump(recording_id, index) do
-    Phoenix.PubSub.broadcast(PhoenixReplay.PubSub, "replay:#{recording_id}", {:replay_jump, index})
+    Phoenix.PubSub.broadcast(
+      PhoenixReplay.PubSub,
+      "replay:#{recording_id}",
+      {:replay_jump, index}
+    )
   end
 
   @impl true
@@ -104,16 +110,6 @@ defmodule PhoenixReplay.Live.Show do
 
   defp current_event(recording, index) do
     Enum.at(recording.events, index)
-  end
-
-  defp accumulated_assigns(recording, index) do
-    recording.events
-    |> Enum.take(index + 1)
-    |> Enum.reduce(%{}, fn
-      {_, :mount, %{assigns: assigns}}, _acc -> assigns
-      {_, :assigns, %{delta: delta}}, acc -> Map.merge(acc, delta)
-      _, acc -> acc
-    end)
   end
 
   defp event_icon(:mount), do: "🚀"
@@ -242,7 +238,7 @@ defmodule PhoenixReplay.Live.Show do
           <div class="rp-card">
             <div class="rp-card-body">
               <h2 style="font-size:0.875rem; font-weight:600; margin:0 0 0.5rem;">📦 Assigns</h2>
-              <pre class="rp-pre"><%= inspect(accumulated_assigns(@recording, @current_index), pretty: true, limit: 30) %></pre>
+              <pre class="rp-pre"><%= inspect(Recording.accumulated_assigns(@recording, @current_index), pretty: true, limit: 30) %></pre>
             </div>
           </div>
         </div>

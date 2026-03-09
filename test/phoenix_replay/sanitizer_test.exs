@@ -40,7 +40,14 @@ defmodule PhoenixReplay.SanitizerTest do
 
   test "sanitize_delta returns only changed non-internal keys" do
     changed = %{count: true, __changed__: true, flash: true, live_action: true}
-    assigns = %{count: 5, __changed__: %{count: true}, flash: %{}, live_action: :edit, name: "Dan"}
+
+    assigns = %{
+      count: 5,
+      __changed__: %{count: true},
+      flash: %{},
+      live_action: :edit,
+      name: "Dan"
+    }
 
     result = Sanitizer.sanitize_delta(changed, assigns)
 

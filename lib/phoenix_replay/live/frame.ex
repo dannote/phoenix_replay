@@ -9,7 +9,7 @@ defmodule PhoenixReplay.Live.Frame do
 
   use Phoenix.LiveView
 
-  alias PhoenixReplay.Store
+  alias PhoenixReplay.{Recording, Store}
 
   @impl true
   def mount(%{"id" => id} = params, _session, socket) do
@@ -21,14 +21,13 @@ defmodule PhoenixReplay.Live.Frame do
       Phoenix.PubSub.subscribe(PhoenixReplay.PubSub, "replay:#{id}")
     end
 
-    assigns = accumulated_assigns(recording, index)
+    assigns = Recording.accumulated_assigns(recording, index)
 
     {:ok,
      socket
      |> assign(:_recording, recording)
      |> assign(:_current_index, index)
-     |> inject_assigns(assigns),
-     layout: false}
+     |> inject_assigns(assigns), layout: false}
   end
 
   @impl true
@@ -37,7 +36,7 @@ defmodule PhoenixReplay.Live.Frame do
     min_index = first_renderable_index(recording)
     max = length(recording.events) - 1
     index = max(min_index, min(index, max))
-    assigns = accumulated_assigns(recording, index)
+    assigns = Recording.accumulated_assigns(recording, index)
 
     {:noreply,
      socket
@@ -66,23 +65,15 @@ defmodule PhoenixReplay.Live.Frame do
 
   defp fetch_recording!(id) do
     case Store.get_recording(id) do
-      {:ok, rec} -> rec
+      {:ok, rec} ->
+        rec
+
       :error ->
         case Store.get_active(id) do
           {:ok, rec} -> rec
           :error -> raise "Recording not found: #{id}"
         end
     end
-  end
-
-  defp accumulated_assigns(recording, index) do
-    recording.events
-    |> Enum.take(index + 1)
-    |> Enum.reduce(%{}, fn
-      {_, :mount, %{assigns: a}}, _acc -> a
-      {_, :assigns, %{delta: delta}}, acc -> Map.merge(acc, delta)
-      _, acc -> acc
-    end)
   end
 
   defp inject_assigns(socket, recorded_assigns) do

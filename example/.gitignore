@@ -35,3 +35,8 @@ example-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+

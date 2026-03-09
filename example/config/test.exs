@@ -1,5 +1,9 @@
 import Config
 
+config :example, Example.Repo,
+  database: Path.expand("../example_test.db", __DIR__),
+  pool: Ecto.Adapters.SQL.Sandbox
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :example, ExampleWeb.Endpoint,

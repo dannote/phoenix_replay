@@ -36,7 +36,6 @@ defmodule PhoenixReplay.RecorderTest do
     assert recording.id == replay_id
     assert length(recording.events) > 0
 
-    # Verify the assigns deltas captured the count changes
     assigns_events =
       Enum.filter(recording.events, fn {_t, type, _p} -> type == :assigns end)
 

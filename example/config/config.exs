@@ -8,7 +8,12 @@
 import Config
 
 config :example,
+  ecto_repos: [Example.Repo],
   generators: [timestamp_type: :utc_datetime]
+
+config :example, Example.Repo,
+  database: Path.expand("../example_dev.db", __DIR__),
+  pool_size: 5
 
 # Configure the endpoint
 config :example, ExampleWeb.Endpoint,

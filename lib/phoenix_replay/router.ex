@@ -25,13 +25,13 @@ defmodule PhoenixReplay.Router do
 
         live_session :phoenix_replay,
           root_layout: {PhoenixReplay.Layouts, :root} do
-          live "/", PhoenixReplay.Live.Index, :index, as: :replay_index
-          live "/:id", PhoenixReplay.Live.Show, :show, as: :replay_show
+          live("/", PhoenixReplay.Live.Index, :index, as: :replay_index)
+          live("/:id", PhoenixReplay.Live.Show, :show, as: :replay_show)
         end
 
         live_session :phoenix_replay_frame,
           root_layout: {PhoenixReplay.Layouts, :frame} do
-          live "/:id/frame", PhoenixReplay.Live.Frame, :frame, as: :replay_frame
+          live("/:id/frame", PhoenixReplay.Live.Frame, :frame, as: :replay_frame)
         end
       end
     end

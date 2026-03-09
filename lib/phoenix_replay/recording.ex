@@ -16,7 +16,7 @@ defmodule PhoenixReplay.Recording do
     events: []
   ]
 
-  @type event_type :: :mount | :event | :handle_params | :info
+  @type event_type :: :mount | :event | :handle_params | :info | :assigns
   @type event :: {non_neg_integer(), event_type(), map()}
 
   @type t :: %__MODULE__{
@@ -28,4 +28,18 @@ defmodule PhoenixReplay.Recording do
           connected_at: integer(),
           events: [event()]
         }
+
+  @doc """
+  Replays events up to `index` and returns the accumulated assigns map.
+  """
+  @spec accumulated_assigns(t(), non_neg_integer()) :: map()
+  def accumulated_assigns(%__MODULE__{events: events}, index) do
+    events
+    |> Enum.take(index + 1)
+    |> Enum.reduce(%{}, fn
+      {_, :mount, %{assigns: a}}, _acc -> a
+      {_, :assigns, %{delta: delta}}, acc -> Map.merge(acc, delta)
+      _, acc -> acc
+    end)
+  end
 end
