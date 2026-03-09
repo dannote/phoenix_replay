@@ -91,43 +91,42 @@ defmodule PhoenixReplay.Live.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="rp-container">
-      <div class="rp-header">
-        <h1>📹 PhoenixReplay</h1>
-        <span class="rp-muted" style="font-size:0.875rem">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+      <div class="flex items-center justify-between mb-8">
+        <h1 class="text-2xl font-bold">📹 PhoenixReplay</h1>
+        <span class="text-sm text-neutral-500">
           {length(@recordings)} recording{if length(@recordings) != 1, do: "s"}
         </span>
       </div>
 
-      <div :if={@recordings == []} class="rp-empty">
-        <div class="rp-empty-icon">📹</div>
+      <div :if={@recordings == []} class="text-center py-16 text-neutral-400">
+        <div class="text-5xl mb-4">📹</div>
         <p>No recordings yet.</p>
-        <p class="rp-muted" style="font-size:0.875rem">
-          Add <code>on_mount: [PhoenixReplay.Recorder]</code> to a live_session and start using your app.
+        <p class="text-sm mt-1">
+          Add <code class="font-mono text-neutral-600">on_mount: [PhoenixReplay.Recorder]</code> to a live_session and start using your app.
         </p>
       </div>
 
       <.link
         :for={rec <- @recordings}
         navigate={"#{@base_path}/#{rec.id}"}
-        class="rp-card"
-        style="display:block; color:inherit; text-decoration:none;"
+        class="block bg-white rounded-lg border border-neutral-200 mb-3 hover:shadow-md transition-shadow no-underline text-inherit"
       >
-        <div class="rp-card-body" style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="px-5 py-4 flex items-center justify-between">
           <div>
-            <div style="font-weight:500; display:flex; align-items:center; gap:0.5rem;">
+            <div class="font-medium flex items-center gap-2">
               {inspect(rec.view)}
-              <span :if={active?(rec)} class="rp-badge rp-badge-live">
-                <span class="rp-dot-live" /> LIVE
+              <span :if={active?(rec)} class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                <span class="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" /> LIVE
               </span>
             </div>
-            <div class="rp-muted" style="font-size:0.875rem; margin-top:0.25rem;">
+            <div class="text-sm text-neutral-500 mt-1">
               Started at {format_time(rec.connected_at)}
               · {length(rec.events)} events
               · {format_duration(duration_ms(rec))}
             </div>
           </div>
-          <div class="rp-mono rp-muted" style="font-size:0.8125rem;">
+          <div class="font-mono text-sm text-neutral-400">
             {String.slice(rec.id, 0..7)}
           </div>
         </div>

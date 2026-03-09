@@ -63,15 +63,14 @@ defmodule PhoenixReplay.Live.ShowTest do
     refute html =~ "⏸"
   end
 
-  test "renders scrubber with max = last event index" do
+  test "renders scrubber with duration data attribute" do
     {_view, html} = mount_show()
     assert html =~ ~s(id="rp-scrubber")
-    assert html =~ ~s(max="9")
+    assert html =~ ~s(data-duration="12100")
   end
 
   test "renders event markers" do
     {_view, html} = mount_show()
-    assert html =~ "rp-scrub-marker"
     assert html =~ ~s(title="mount")
     assert html =~ ~s(title="inc")
     assert html =~ ~s(title="dec")
@@ -82,7 +81,7 @@ defmodule PhoenixReplay.Live.ShowTest do
   test "step_forward advances current_index" do
     {view, _html} = mount_show()
     render_click(view, "step_forward")
-    assert view |> element("#rp-scrubber") |> render() =~ ~s(max="9")
+    assert render(view) =~ "0:01"
   end
 
   test "step_back at beginning stays at 0" do
@@ -104,7 +103,7 @@ defmodule PhoenixReplay.Live.ShowTest do
     render_click(view, "jump", %{"index" => "4"})
     render_click(view, "toggle_events")
     html = render(view)
-    assert html =~ "active"
+    assert html =~ "bg-indigo-600"
   end
 
   test "scrub by index from scrubber" do
@@ -112,7 +111,7 @@ defmodule PhoenixReplay.Live.ShowTest do
     render_click(view, "scrub", %{"index" => "6"})
     render_click(view, "toggle_events")
     html = render(view)
-    assert html =~ "active"
+    assert html =~ "bg-indigo-600"
   end
 
   # --- Play / Pause push events ---
@@ -175,7 +174,7 @@ defmodule PhoenixReplay.Live.ShowTest do
 
   test "handle_params pushes init event with event offsets" do
     {view, _html} = mount_show()
-    assert render(view) =~ ~s(max="9")
+    assert render(view) =~ ~s(data-duration="12100")
   end
 
   # --- Redirect ---

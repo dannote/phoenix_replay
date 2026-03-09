@@ -74,11 +74,11 @@ defmodule ExampleWeb.Features.ReplayTest do
     |> assert_has("pre")
   end
 
-  test "scrubber range input exists with step=1", %{conn: conn} do
+  test "scrubber range input exists", %{conn: conn} do
     conn
     |> create_recording_and_go_to_replay()
     |> open_first_recording()
-    |> assert_has("#rp-scrubber[step='1']")
+    |> assert_has("#rp-scrubber[step='any']")
   end
 
   test "speed button is rendered", %{conn: conn} do

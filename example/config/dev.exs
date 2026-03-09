@@ -47,11 +47,10 @@ config :example, ExampleWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
-      # Static assets, except user uploads
       ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
-      # Router, Controllers, LiveViews and LiveComponents
       ~r"lib/example_web/router\.ex$",
-      ~r"lib/example_web/(controllers|live|components)/.*\.(ex|heex)$"
+      ~r"lib/example_web/(controllers|live|components)/.*\.(ex|heex)$",
+      ~r"../lib/.*(ex|heex)$"
     ]
   ]
 

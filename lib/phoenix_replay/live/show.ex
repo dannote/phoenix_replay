@@ -122,7 +122,8 @@ defmodule PhoenixReplay.Live.Show do
      socket
      |> assign(:current_index, idx)
      |> assign(:playing, false)
-     |> push_event("stop", %{})}
+     |> push_event("stop", %{})
+     |> push_event("jump", %{index: idx})}
   end
 
   defp clamp_index(socket, index) do
@@ -199,121 +200,127 @@ defmodule PhoenixReplay.Live.Show do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="rp-container" style="max-width:1200px;">
-      <div style="margin-bottom:1rem;">
-        <.link navigate={@base_path} style="font-size:0.875rem;" class="rp-muted">← Recordings</.link>
-        <h1 style="font-size:1.5rem; font-weight:700; margin:0.25rem 0;">{inspect(@recording.view)}</h1>
-        <p class="rp-muted" style="font-size:0.875rem; margin:0;">
-          Session <code class="rp-mono">{String.slice(@recording.id, 0..11)}</code>
+    <div class="max-w-5xl mx-auto px-4 py-8">
+      <div class="mb-4">
+        <.link navigate={@base_path} class="text-sm text-neutral-500 hover:text-neutral-700">← Recordings</.link>
+        <h1 class="text-2xl font-bold mt-1">{inspect(@recording.view)}</h1>
+        <p class="text-sm text-neutral-500">
+          Session <code class="font-mono">{String.slice(@recording.id, 0..11)}</code>
           · {length(@recording.events)} events
           · {format_time(@duration_ms)}
         </p>
       </div>
 
       <%!-- Player --%>
-      <div class="rp-card" style="margin-bottom:1rem;">
-        <div style="padding:0.75rem 1.25rem;">
-          <%!-- Controls row --%>
-          <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;">
-            <button phx-click="step_back" class="rp-btn" disabled={@current_index == 0} style="padding:0.25rem 0.5rem;">⏮</button>
-            <%= if @playing do %>
-              <button phx-click="pause" class="rp-btn rp-btn-warning" style="padding:0.25rem 0.75rem;">⏸</button>
-            <% else %>
-              <button phx-click="play" class="rp-btn rp-btn-primary" style="padding:0.25rem 0.75rem;">▶</button>
-            <% end %>
-            <button phx-click="step_forward" class="rp-btn" disabled={@current_index == last_event_index(@recording)} style="padding:0.25rem 0.5rem;">⏭</button>
+      <div class="bg-white rounded-lg border border-neutral-200 p-4 mb-4">
+        <%!-- Controls row --%>
+        <div class="flex items-center gap-2 mb-3">
+          <button phx-click="step_back" disabled={@current_index == 0}
+            class="px-2 py-1 rounded-md border border-neutral-300 bg-white text-sm hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-default">⏮</button>
+          <%= if @playing do %>
+            <button phx-click="pause"
+              class="px-3 py-1 rounded-md bg-amber-500 text-white text-sm hover:bg-amber-600">⏸</button>
+          <% else %>
+            <button phx-click="play"
+              class="px-3 py-1 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">▶</button>
+          <% end %>
+          <button phx-click="step_forward" disabled={@current_index == last_event_index(@recording)}
+            class="px-2 py-1 rounded-md border border-neutral-300 bg-white text-sm hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-default">⏭</button>
 
-            <span class="rp-mono" style="font-size:0.8125rem; margin-left:0.5rem; color:#525252;">
-              {format_time(current_event_ms(@recording, @current_index))} / {format_time(@duration_ms)}
-            </span>
+          <span class="font-mono text-sm text-neutral-600 ml-2">
+            {format_time(current_event_ms(@recording, @current_index))} / {format_time(@duration_ms)}
+          </span>
 
-            <span style="flex:1;"></span>
+          <span class="flex-1"></span>
 
-            <div class="rp-speed-menu">
-              <button class="rp-btn" style="padding:0.25rem 0.5rem; font-size:0.8125rem;">{@speed}×</button>
-              <ul>
-                <li :for={s <- [1, 2, 5, 10]} phx-click="speed" phx-value-speed={s}>{s}×</li>
-              </ul>
-            </div>
+          <div class="relative group">
+            <button class="px-2 py-1 rounded-md border border-neutral-300 bg-white text-sm hover:bg-neutral-50">{@speed}×</button>
+            <ul class="hidden group-hover:block absolute bottom-full right-0 bg-white border border-neutral-200 rounded-lg p-1 shadow-lg mb-1">
+              <li :for={s <- [1, 2, 5, 10]} phx-click="speed" phx-value-speed={s}
+                class="px-3 py-1 text-sm rounded cursor-pointer hover:bg-neutral-100 whitespace-nowrap">{s}×</li>
+            </ul>
           </div>
+        </div>
 
-          <%!-- Scrubber: value = event index, max = last event index --%>
-          <div class="rp-scrub-wrap">
+        <%!-- Scrubber (Reka UI-style: div-based, no native range input) --%>
+        <div
+          id="rp-scrubber"
+          class="relative flex items-center select-none h-5 touch-none cursor-pointer"
+          data-duration={@duration_ms}
+          phx-update="ignore"
+        >
+          <%!-- Track --%>
+          <div class="relative flex-1 h-1 bg-neutral-200 rounded-full">
+            <%!-- Markers on the track --%>
             <div
               :for={m <- event_markers(@recording.events, @duration_ms)}
-              class="rp-scrub-marker"
+              class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
               style={"left:#{m.pct}%;"}
               title={event_label(Enum.at(@recording.events, m.index))}
             >
-              <div style={"width:#{if m.type in [:event, :mount, :handle_params], do: 6, else: 3}px; height:#{if m.type in [:event, :mount, :handle_params], do: 6, else: 3}px; border-radius:50%; background:#{marker_color(m.type)};"}></div>
+              <div class={[
+                "rounded-full",
+                if(m.type in [:event, :mount, :handle_params], do: "w-1.5 h-1.5", else: "w-1 h-1")
+              ]} style={"background:#{marker_color(m.type)};"} />
             </div>
-            <input
-              id="rp-scrubber"
-              type="range"
-              min="0"
-              max={last_event_index(@recording)}
-              value={@current_index}
-              step="1"
-              class="rp-scrub-range"
-              phx-update="ignore"
-            />
           </div>
-          <%!-- Hidden forms for JS→server communication --%>
-          <form id="rp-tick-bridge" phx-change="tick" phx-update="ignore" style="display:none;">
-            <input type="hidden" name="index" value="0" />
-          </form>
-          <form id="rp-scrub-bridge" phx-change="scrub" phx-update="ignore" style="display:none;">
-            <input type="hidden" name="index" value="0" />
-          </form>
-          <form id="rp-ended-bridge" phx-change="playback_ended" phx-update="ignore" style="display:none;">
-            <input type="hidden" name="ended" value="0" />
-          </form>
+          <%!-- Thumb (positioned by JS) --%>
+          <div id="rp-thumb" class="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-indigo-600 border-2 border-white shadow-sm -translate-x-1/2" style="left:0%;"></div>
         </div>
+
+        <%!-- Hidden forms for JS→server communication --%>
+        <form id="rp-tick-bridge" phx-change="tick" phx-update="ignore" class="hidden">
+          <input type="hidden" name="index" value="0" />
+        </form>
+        <form id="rp-scrub-bridge" phx-change="scrub" phx-update="ignore" class="hidden">
+          <input type="hidden" name="index" value="0" />
+        </form>
+        <form id="rp-ended-bridge" phx-change="playback_ended" phx-update="ignore" class="hidden">
+          <input type="hidden" name="ended" value="0" />
+        </form>
       </div>
 
       <%!-- Iframe --%>
-      <div class="rp-card" style="overflow:hidden; margin-bottom:1rem;">
+      <div class="bg-white rounded-lg border border-neutral-200 overflow-hidden mb-4">
         <iframe
           id="replay-frame"
           src={"#{@base_path}/#{@recording.id}/frame"}
-          style="width:100%; height:600px; border:none; display:block;"
+          class="w-full h-[600px] border-none block"
         />
       </div>
 
       <%!-- Events panel --%>
       <div>
-        <button phx-click="toggle_events" class="rp-btn" style="font-size:0.8125rem;">
+        <button phx-click="toggle_events"
+          class="px-3 py-1.5 rounded-md border border-neutral-300 bg-white text-sm hover:bg-neutral-50">
           {if @show_events, do: "▼", else: "▶"} Events ({length(@recording.events)})
         </button>
 
-        <div :if={@show_events} style="margin-top:0.75rem; display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
-          <div class="rp-card">
-            <div class="rp-card-body" style="padding:0.75rem;">
-              <div class="rp-timeline">
-                <button
-                  :for={{event, i} <- Enum.with_index(@recording.events)}
-                  phx-click="jump"
-                  phx-value-index={i}
-                  class={"rp-timeline-item #{if i == @current_index, do: "active"} #{if i > @current_index, do: "future"}"}
-                  style="font-size:0.8125rem; padding:0.25rem 0.5rem;"
-                >
-                  <span>{event_icon(elem(event, 1))}</span>
-                  <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    {event_label(event)}
-                  </span>
-                  <span class="rp-mono" style={"font-size:0.6875rem; #{if i == @current_index, do: "opacity:0.7;", else: "color:#a3a3a3;"}"}>
-                    {format_time(elem(event, 0))}
-                  </span>
-                </button>
-              </div>
+        <div :if={@show_events} class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="bg-white rounded-lg border border-neutral-200 p-3">
+            <div class="max-h-[500px] overflow-y-auto">
+              <button
+                :for={{event, i} <- Enum.with_index(@recording.events)}
+                phx-click="jump"
+                phx-value-index={i}
+                class={[
+                  "flex items-center gap-2 w-full text-left text-sm px-2 py-1 rounded-md",
+                  if(i == @current_index, do: "bg-indigo-600 text-white", else: "hover:bg-neutral-100"),
+                  if(i > @current_index, do: "opacity-35")
+                ]}
+              >
+                <span>{event_icon(elem(event, 1))}</span>
+                <span class="flex-1 truncate">{event_label(event)}</span>
+                <span class={["font-mono text-xs", if(i == @current_index, do: "opacity-70", else: "text-neutral-400")]}>
+                  {format_time(elem(event, 0))}
+                </span>
+              </button>
             </div>
           </div>
 
-          <div class="rp-card">
-            <div class="rp-card-body">
-              <h2 style="font-size:0.875rem; font-weight:600; margin:0 0 0.5rem;">📦 Assigns</h2>
-              <pre class="rp-pre"><%= inspect(Recording.accumulated_assigns(@recording, @current_index), pretty: true, limit: 30) %></pre>
-            </div>
+          <div class="bg-white rounded-lg border border-neutral-200 p-4">
+            <h2 class="text-sm font-semibold mb-2">📦 Assigns</h2>
+            <pre class="bg-neutral-100 rounded-md p-3 text-xs overflow-auto whitespace-pre-wrap break-words max-h-80"><%= inspect(Recording.accumulated_assigns(@recording, @current_index), pretty: true, limit: 30) %></pre>
           </div>
         </div>
       </div>
