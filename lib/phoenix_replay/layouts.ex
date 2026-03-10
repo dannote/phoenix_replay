@@ -228,12 +228,13 @@ defmodule PhoenixReplay.Layouts do
         setThumb(ms);
       });
 
-      /* Auto-scroll active event into view after LiveView DOM patch */
+      /* Auto-scroll active event into view within the events panel only */
       function scrollActiveEvent() {
         var container = getEl("rp-events");
         if (!container) return;
         var active = container.querySelector("[class*='bg-neutral-900']");
-        if (active) active.scrollIntoView({ block: "nearest" });
+        if (!active) return;
+        container.scrollTop = active.offsetTop - container.offsetTop;
       }
 
       var scrollObserver = new MutationObserver(scrollActiveEvent);
