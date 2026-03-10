@@ -28,10 +28,10 @@ defmodule PhoenixReplay.Storage.Serializer do
     end
   end
 
-  @doc "File extension for the format."
+  @doc "File extension for the format (gzip-compressed)."
   @spec extension(:etf | :json) :: String.t()
-  def extension(:etf), do: ".etf"
-  def extension(:json), do: ".json"
+  def extension(:etf), do: ".etf.gz"
+  def extension(:json), do: ".json.gz"
 
   defp to_map(%Recording{} = rec) do
     %{
@@ -73,25 +73,28 @@ defmodule PhoenixReplay.Storage.Serializer do
     %{
       "offset" => offset,
       "type" => to_string(type),
-      "payload" => payload_to_json(payload)
+      "payload" => to_json_value(payload)
     }
   end
 
-  defp payload_to_json(payload) when is_map(payload) do
-    Map.new(payload, fn
-      {k, v} when is_atom(k) -> {to_string(k), payload_value_to_json(v)}
-      {k, v} -> {k, payload_value_to_json(v)}
+  defp to_json_value(%{__struct__: mod} = struct) do
+    struct
+    |> Map.from_struct()
+    |> Map.put("__struct__", inspect(mod))
+    |> to_json_value()
+  end
+
+  defp to_json_value(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {to_string(k), to_json_value(v)}
+      {k, v} -> {k, to_json_value(v)}
     end)
   end
 
-  defp payload_value_to_json(v) when is_atom(v), do: to_string(v)
-  defp payload_value_to_json(v) when is_map(v), do: payload_to_json(v)
-  defp payload_value_to_json(v) when is_list(v), do: Enum.map(v, &payload_value_to_json/1)
-
-  defp payload_value_to_json(v) when is_tuple(v),
-    do: Tuple.to_list(v) |> Enum.map(&payload_value_to_json/1)
-
-  defp payload_value_to_json(v), do: v
+  defp to_json_value(list) when is_list(list), do: Enum.map(list, &to_json_value/1)
+  defp to_json_value(v) when is_tuple(v), do: Tuple.to_list(v) |> Enum.map(&to_json_value/1)
+  defp to_json_value(v) when is_atom(v) and not is_boolean(v) and not is_nil(v), do: to_string(v)
+  defp to_json_value(v), do: v
 
   defp from_json_map(map) do
     %Recording{

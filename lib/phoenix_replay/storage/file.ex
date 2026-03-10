@@ -1,6 +1,6 @@
 defmodule PhoenixReplay.Storage.File do
   @moduledoc """
-  File-based storage backend. Writes one file per recording.
+  File-based storage backend. Writes one gzip-compressed file per recording.
 
   ## Options
 
@@ -25,7 +25,7 @@ defmodule PhoenixReplay.Storage.File do
   def save(recording, opts) do
     with {:ok, data} <- Serializer.encode(recording, format(opts)) do
       path = file_path(recording.id, opts)
-      File.write(path, data)
+      File.write(path, :zlib.gzip(data))
     end
   end
 
@@ -33,29 +33,23 @@ defmodule PhoenixReplay.Storage.File do
   def get(id, opts) do
     path = file_path(id, opts)
 
-    case File.read(path) do
-      {:ok, data} ->
-        case Serializer.decode(data, format(opts)) do
-          {:ok, recording} -> {:ok, recording}
-          {:error, _} -> :error
-        end
-
-      {:error, _} ->
-        :error
+    with {:ok, data} <- File.read(path),
+         {:ok, recording} <- Serializer.decode(:zlib.gunzip(data), format(opts)) do
+      {:ok, recording}
+    else
+      _ -> get_legacy(id, opts)
     end
   end
 
   @impl true
   def list(opts) do
-    ext = Serializer.extension(format(opts))
     base = dir(opts)
 
     case File.ls(base) do
       {:ok, files} ->
         files
-        |> Enum.filter(&String.ends_with?(&1, ext))
         |> Enum.flat_map(fn filename ->
-          id = String.trim_trailing(filename, ext)
+          id = strip_extensions(filename)
 
           case get(id, opts) do
             {:ok, recording} -> [recording]
@@ -72,27 +66,20 @@ defmodule PhoenixReplay.Storage.File do
   @impl true
   def delete(id, opts) do
     path = file_path(id, opts)
+    legacy = legacy_path(id, opts)
 
-    case File.rm(path) do
-      :ok -> :ok
-      {:error, :enoent} -> :ok
-      error -> error
-    end
+    File.rm(path)
+    File.rm(legacy)
+    :ok
   end
 
   @impl true
   def clear(opts) do
-    ext = Serializer.extension(format(opts))
     base = dir(opts)
 
     case File.ls(base) do
       {:ok, files} ->
-        Enum.each(files, fn filename ->
-          if String.ends_with?(filename, ext) do
-            File.rm(Path.join(base, filename))
-          end
-        end)
-
+        Enum.each(files, fn filename -> File.rm(Path.join(base, filename)) end)
         :ok
 
       {:error, _} ->
@@ -103,5 +90,39 @@ defmodule PhoenixReplay.Storage.File do
   defp file_path(id, opts) do
     basename = Path.basename(id)
     Path.join(dir(opts), basename <> Serializer.extension(format(opts)))
+  end
+
+  defp legacy_path(id, opts) do
+    basename = Path.basename(id)
+    legacy_ext = if format(opts) == :json, do: ".json", else: ".etf"
+    Path.join(dir(opts), basename <> legacy_ext)
+  end
+
+  defp get_legacy(id, opts) do
+    path = legacy_path(id, opts)
+
+    case File.read(path) do
+      {:ok, data} ->
+        data = maybe_gunzip(data)
+
+        case Serializer.decode(data, format(opts)) do
+          {:ok, recording} -> {:ok, recording}
+          _ -> :error
+        end
+
+      {:error, _} ->
+        :error
+    end
+  end
+
+  defp maybe_gunzip(<<0x1F, 0x8B, _rest::binary>> = data), do: :zlib.gunzip(data)
+  defp maybe_gunzip(data), do: data
+
+  defp strip_extensions(filename) do
+    filename
+    |> String.replace_suffix(".etf.gz", "")
+    |> String.replace_suffix(".json.gz", "")
+    |> String.replace_suffix(".etf", "")
+    |> String.replace_suffix(".json", "")
   end
 end

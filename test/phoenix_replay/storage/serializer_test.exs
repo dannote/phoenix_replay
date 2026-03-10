@@ -20,6 +20,39 @@ defmodule PhoenixReplay.Storage.SerializerTest do
     }
   end
 
+  defp recording_with_form do
+    %Recording{
+      id: "form-test",
+      view: PhoenixReplay.TestLive.Form,
+      url: "http://localhost/form",
+      params: %{},
+      session: %{},
+      connected_at: 1_700_000_000_000,
+      events: [
+        {0, :mount, %{assigns: %{name: ""}}},
+        {100, :event, %{name: "validate", params: %{"name" => "Hi"}}},
+        {200, :assigns,
+         %{
+           delta: %{
+             form: %Phoenix.HTML.Form{
+               source: %{"name" => "Hi"},
+               impl: Phoenix.HTML.FormData.Map,
+               id: "form",
+               name: "form",
+               data: %{name: ""},
+               action: :validate,
+               hidden: [],
+               params: %{"name" => "Hi"},
+               errors: [],
+               options: [],
+               index: nil
+             }
+           }
+         }}
+      ]
+    }
+  end
+
   test "ETF roundtrip preserves all data" do
     rec = sample_recording()
     {:ok, encoded} = Serializer.encode(rec, :etf)
@@ -48,17 +81,23 @@ defmodule PhoenixReplay.Storage.SerializerTest do
     assert type == :mount
   end
 
+  test "JSON encodes recordings with Phoenix.HTML.Form structs" do
+    rec = recording_with_form()
+    assert {:ok, encoded} = Serializer.encode(rec, :json)
+    assert {:ok, _} = Jason.decode(encoded)
+  end
+
   test "JSON output is valid JSON" do
     rec = sample_recording()
     {:ok, encoded} = Serializer.encode(rec, :json)
     assert {:ok, _} = Jason.decode(encoded)
   end
 
-  test "ETF extension" do
-    assert Serializer.extension(:etf) == ".etf"
+  test "ETF extension includes .gz" do
+    assert Serializer.extension(:etf) == ".etf.gz"
   end
 
-  test "JSON extension" do
-    assert Serializer.extension(:json) == ".json"
+  test "JSON extension includes .gz" do
+    assert Serializer.extension(:json) == ".json.gz"
   end
 end
