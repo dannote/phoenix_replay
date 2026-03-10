@@ -53,38 +53,39 @@ defmodule PhoenixReplay.RecorderTest do
     assert html_response(conn, 200) =~ "count"
   end
 
-  test "records assigns deltas after form validate events" do
+  test "records assigns delta with intermediate values for each keystroke" do
     {:ok, view, _html} = live(build_conn(), "/form")
     replay_id = :sys.get_state(view.pid).socket.assigns._replay_id
 
+    render_change(view, "validate", %{"name" => "H"})
     render_change(view, "validate", %{"name" => "He"})
     render_change(view, "validate", %{"name" => "Hel"})
+    render_change(view, "validate", %{"name" => "Hell"})
     render_change(view, "validate", %{"name" => "Hello"})
 
     {:ok, active} = Store.get_active(replay_id)
 
-    event_types = Enum.map(active.events, fn {_t, type, _p} -> type end)
-    assert Enum.count(event_types, &(&1 == :event)) == 3
+    assert Enum.count(active.events, fn {_, :event, _} -> true; _ -> false end) == 5
 
-    assigns_events =
+    name_values =
       active.events
-      |> Enum.filter(fn {_, :assigns, _} -> true; _ -> false end)
-
-    has_name =
-      Enum.any?(assigns_events, fn {_, :assigns, payload} ->
-        name = get_in(payload, [:delta, :name]) || get_in(payload, [:snapshot, :name])
-        name != nil
+      |> Enum.flat_map(fn
+        {_, :assigns, %{delta: %{name: n}}} -> [n]
+        {_, :assigns, %{snapshot: %{name: n}}} -> [n]
+        _ -> []
       end)
 
-    assert has_name, "Expected at least one assigns entry with :name"
+    assert name_values == ["", "H", "He", "Hel", "Hell", "Hello"]
   end
 
-  test "form assigns are replayable via accumulated_assigns" do
+  test "form assigns are replayable via accumulated_assigns at each event" do
     alias PhoenixReplay.Recording
 
     {:ok, view, _html} = live(build_conn(), "/form")
     replay_id = :sys.get_state(view.pid).socket.assigns._replay_id
 
+    render_change(view, "validate", %{"name" => "A"})
+    render_change(view, "validate", %{"name" => "Al"})
     render_change(view, "validate", %{"name" => "Alice"})
     render_click(view, "submit", %{"name" => "Alice"})
 
@@ -93,11 +94,26 @@ defmodule PhoenixReplay.RecorderTest do
 
     {:ok, recording} = Store.get_recording(replay_id)
 
-    last_index = length(recording.events) - 1
-    final_assigns = Recording.accumulated_assigns(recording, last_index)
+    validate_indices =
+      recording.events
+      |> Enum.with_index()
+      |> Enum.flat_map(fn
+        {{_, :event, %{name: "validate"}}, i} -> [i]
+        _ -> []
+      end)
 
-    assert final_assigns[:name] == "Alice"
-    assert final_assigns[:submitted] == true
+    replayed_names =
+      Enum.map(validate_indices, fn i ->
+        assigns = Recording.accumulated_assigns(recording, i + 1)
+        assigns[:name]
+      end)
+
+    assert replayed_names == ["A", "Al", "Alice"]
+
+    last_index = length(recording.events) - 1
+    final = Recording.accumulated_assigns(recording, last_index)
+    assert final[:name] == "Alice"
+    assert final[:submitted] == true
   end
 
   test "accumulated_assigns works with snapshot events" do
@@ -123,5 +139,26 @@ defmodule PhoenixReplay.RecorderTest do
     assert Recording.accumulated_assigns(recording, 0) == %{name: "", count: 0}
     assert Recording.accumulated_assigns(recording, 3) == %{name: "AB", count: 0}
     assert Recording.accumulated_assigns(recording, 5) == %{name: "AB", count: 1}
+  end
+
+  test "snapshot replaces all previous assigns, not merges" do
+    alias PhoenixReplay.Recording
+
+    recording = %Recording{
+      id: "snap-replace",
+      view: SomeLive,
+      url: nil,
+      params: %{},
+      session: %{},
+      connected_at: 0,
+      events: [
+        {0, :mount, %{assigns: %{a: 1, b: 2, c: 3}}},
+        {100, :assigns, %{snapshot: %{a: 10, b: 20}}}
+      ]
+    }
+
+    result = Recording.accumulated_assigns(recording, 1)
+    assert result == %{a: 10, b: 20}
+    refute Map.has_key?(result, :c)
   end
 end

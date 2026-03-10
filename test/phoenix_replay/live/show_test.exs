@@ -201,6 +201,45 @@ defmodule PhoenixReplay.Live.ShowTest do
     assert html =~ "dec"
   end
 
+  # --- Form typing replay ---
+
+  test "stepping through form events shows intermediate values in assigns panel" do
+    Store.clear_all()
+
+    recording = %Recording{
+      id: "test-typing-rec",
+      view: PhoenixReplay.TestLive.Form,
+      url: "http://localhost/form",
+      params: %{},
+      session: %{},
+      connected_at: System.system_time(:millisecond),
+      events: [
+        {0, :mount, %{assigns: %{name: "", submitted: false}}},
+        {100, :assigns, %{delta: %{name: "", submitted: false}}},
+        {1000, :event, %{name: "validate", params: %{"_target" => ["name"], "name" => "H"}}},
+        {1001, :assigns, %{delta: %{name: "H"}}},
+        {2000, :event, %{name: "validate", params: %{"_target" => ["name"], "name" => "He"}}},
+        {2001, :assigns, %{delta: %{name: "He"}}},
+        {3000, :event, %{name: "validate", params: %{"_target" => ["name"], "name" => "Hello"}}},
+        {3001, :assigns, %{delta: %{name: "Hello"}}}
+      ]
+    }
+
+    PhoenixReplay.Storage.backend().save(recording, PhoenixReplay.Storage.storage_opts())
+
+    {:ok, view, _html} = live(build_conn(), "/replay/test-typing-rec")
+
+    html = render_click(view, "jump", %{"index" => "3"})
+    assert html =~ "validate: name=H"
+    assert html =~ "&quot;H&quot;"
+
+    html = render_click(view, "jump", %{"index" => "5"})
+    assert html =~ "&quot;He&quot;"
+
+    html = render_click(view, "jump", %{"index" => "7"})
+    assert html =~ "&quot;Hello&quot;"
+  end
+
   # --- Redirect ---
 
   test "redirects for nonexistent recording" do
