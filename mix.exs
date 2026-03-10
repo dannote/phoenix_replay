@@ -1,7 +1,7 @@
 defmodule PhoenixReplay.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/dannote/phoenix_replay"
 
   def project do
@@ -48,7 +48,7 @@ defmodule PhoenixReplay.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      files: ~w(lib mix.exs README.md LICENSE screenshot.jpg)
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE screenshot.jpg)
     ]
   end
 
