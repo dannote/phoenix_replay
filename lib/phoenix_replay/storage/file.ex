@@ -101,6 +101,7 @@ defmodule PhoenixReplay.Storage.File do
   end
 
   defp file_path(id, opts) do
-    Path.join(dir(opts), id <> Serializer.extension(format(opts)))
+    basename = Path.basename(id)
+    Path.join(dir(opts), basename <> Serializer.extension(format(opts)))
   end
 end

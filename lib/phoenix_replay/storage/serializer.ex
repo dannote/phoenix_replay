@@ -87,7 +87,10 @@ defmodule PhoenixReplay.Storage.Serializer do
   defp payload_value_to_json(v) when is_atom(v), do: to_string(v)
   defp payload_value_to_json(v) when is_map(v), do: payload_to_json(v)
   defp payload_value_to_json(v) when is_list(v), do: Enum.map(v, &payload_value_to_json/1)
-  defp payload_value_to_json(v) when is_tuple(v), do: Tuple.to_list(v) |> Enum.map(&payload_value_to_json/1)
+
+  defp payload_value_to_json(v) when is_tuple(v),
+    do: Tuple.to_list(v) |> Enum.map(&payload_value_to_json/1)
+
   defp payload_value_to_json(v), do: v
 
   defp from_json_map(map) do

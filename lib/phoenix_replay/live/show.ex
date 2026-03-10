@@ -1,4 +1,5 @@
 defmodule PhoenixReplay.Live.Show do
+  @moduledoc false
   use Phoenix.LiveView
 
   alias PhoenixReplay.{Recording, Store}
@@ -7,7 +8,9 @@ defmodule PhoenixReplay.Live.Show do
   def mount(%{"id" => id}, _session, socket) do
     recording =
       case Store.get_recording(id) do
-        {:ok, rec} -> rec
+        {:ok, rec} ->
+          rec
+
         :error ->
           case Store.get_active(id) do
             {:ok, rec} -> rec
@@ -32,8 +35,7 @@ defmodule PhoenixReplay.Live.Show do
        |> assign(:duration_ms, duration_ms)
        |> assign(:event_offsets, event_offsets)
        |> assign(:speed, 1)
-       |> assign(:playing, false)
-      }
+       |> assign(:playing, false)}
     else
       {:ok, push_navigate(socket, to: "/")}
     end
@@ -107,10 +109,6 @@ defmodule PhoenixReplay.Live.Show do
      socket
      |> assign(:speed, speed)
      |> push_event("speed", %{speed: speed})}
-  end
-
-  def handle_event("toggle_events", _, socket) do
-    {:noreply, socket}
   end
 
   defp jump_to(socket, index) do

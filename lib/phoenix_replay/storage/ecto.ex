@@ -86,9 +86,11 @@ if Code.ensure_loaded?(Ecto) do
       query = from(r in table(), order_by: [desc: r.connected_at], select: r.data)
 
       repo(opts).all(query)
-      |> Enum.map(fn data ->
-        {:ok, recording} = Serializer.decode(data, format(opts))
-        recording
+      |> Enum.flat_map(fn data ->
+        case Serializer.decode(data, format(opts)) do
+          {:ok, recording} -> [recording]
+          :error -> []
+        end
       end)
     end
 

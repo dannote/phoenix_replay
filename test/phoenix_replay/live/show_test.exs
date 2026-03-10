@@ -178,8 +178,16 @@ defmodule PhoenixReplay.Live.ShowTest do
       connected_at: System.system_time(:millisecond),
       events: [
         {0, :mount, %{assigns: %{count: 0}}},
-        {1000, :event, %{name: "validate", params: %{"_target" => ["title"], "title" => "Hello", "priority" => "medium"}}},
-        {2000, :event, %{name: "validate", params: %{"_target" => ["description"], "title" => "Hello", "description" => "World"}}},
+        {1000, :event,
+         %{
+           name: "validate",
+           params: %{"_target" => ["title"], "title" => "Hello", "priority" => "medium"}
+         }},
+        {2000, :event,
+         %{
+           name: "validate",
+           params: %{"_target" => ["description"], "title" => "Hello", "description" => "World"}
+         }},
         {3000, :event, %{name: "save", params: %{"title" => "Hello", "description" => "World"}}},
         {4000, :event, %{name: "delete", params: %{"id" => "42"}}}
       ]

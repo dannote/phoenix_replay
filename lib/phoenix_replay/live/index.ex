@@ -1,4 +1,5 @@
 defmodule PhoenixReplay.Live.Index do
+  @moduledoc false
   use Phoenix.LiveView
 
   alias PhoenixReplay.Store

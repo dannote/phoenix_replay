@@ -65,7 +65,10 @@ defmodule PhoenixReplay.RecorderTest do
 
     {:ok, active} = Store.get_active(replay_id)
 
-    assert Enum.count(active.events, fn {_, :event, _} -> true; _ -> false end) == 5
+    assert Enum.count(active.events, fn
+             {_, :event, _} -> true
+             _ -> false
+           end) == 5
 
     name_values =
       active.events

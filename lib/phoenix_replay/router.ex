@@ -18,8 +18,8 @@ defmodule PhoenixReplay.Router do
   @doc """
   Mounts the PhoenixReplay dashboard at the given path.
   """
-  defmacro phoenix_replay(path, opts \\ []) do
-    quote bind_quoted: binding() do
+  defmacro phoenix_replay(path, _opts \\ []) do
+    quote bind_quoted: [path: path] do
       scope path, alias: false, as: false do
         import Phoenix.LiveView.Router, only: [live: 4, live_session: 3]
 

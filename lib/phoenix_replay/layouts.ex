@@ -230,6 +230,4 @@ defmodule PhoenixReplay.Layouts do
     })();
     """
   end
-
-
 end

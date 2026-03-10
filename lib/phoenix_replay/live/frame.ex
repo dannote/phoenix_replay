@@ -53,7 +53,13 @@ defmodule PhoenixReplay.Live.Frame do
     try do
       view.render(assigns)
     rescue
-      _ ->
+      e ->
+        require Logger
+
+        Logger.warning(
+          "PhoenixReplay: render failed for #{inspect(view)}: #{Exception.message(e)}"
+        )
+
         ~H"""
         <div style="padding:2rem; color:#737373; text-align:center;">
           <p>Could not render {inspect(@_recording.view)} at this point.</p>

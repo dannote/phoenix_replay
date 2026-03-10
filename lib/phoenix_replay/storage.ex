@@ -50,12 +50,12 @@ defmodule PhoenixReplay.Storage do
   @doc "Delete all recordings."
   @callback clear(opts()) :: :ok
 
-  @doc false
+  @doc "Returns the configured storage backend module."
   def backend do
     Application.get_env(:phoenix_replay, :storage, PhoenixReplay.Storage.File)
   end
 
-  @doc false
+  @doc "Returns the configured storage options."
   def storage_opts do
     Application.get_env(:phoenix_replay, :storage_opts, [])
   end
