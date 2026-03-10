@@ -71,6 +71,7 @@ defmodule PhoenixReplay.Recorder do
   end
 
   defp handle_event_hook(event, params, socket) do
+    bump_pending_events(socket)
     record(socket, :event, %{name: event, params: params})
     {:cont, socket}
   end
@@ -87,17 +88,37 @@ defmodule PhoenixReplay.Recorder do
 
   defp after_render_hook(socket) do
     changed = socket.assigns.__changed__
+    pending = get_pending_events(socket)
 
     if changed != %{} do
       sanitizer = sanitizer_mod()
       delta = sanitizer.sanitize_delta(changed, socket.assigns)
 
       if delta != %{} do
-        record(socket, :assigns, %{delta: delta})
+        if pending > 1 do
+          full = sanitizer.sanitize_assigns(socket.assigns)
+          record(socket, :assigns, %{snapshot: full})
+        else
+          record(socket, :assigns, %{delta: delta})
+        end
       end
     end
 
+    reset_pending_events(socket)
     socket
+  end
+
+  defp bump_pending_events(socket) do
+    key = {:replay_pending, socket.assigns[:_replay_id]}
+    Process.put(key, (Process.get(key) || 0) + 1)
+  end
+
+  defp get_pending_events(socket) do
+    Process.get({:replay_pending, socket.assigns[:_replay_id]}) || 0
+  end
+
+  defp reset_pending_events(socket) do
+    Process.put({:replay_pending, socket.assigns[:_replay_id]}, 0)
   end
 
   defp record(socket, type, payload) do

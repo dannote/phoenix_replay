@@ -51,6 +51,77 @@ defmodule PhoenixReplay.RecorderTest do
   test "does not record on static (disconnected) render" do
     conn = get(build_conn(), "/counter")
     assert html_response(conn, 200) =~ "count"
-    # No recordings should exist for static renders
+  end
+
+  test "records assigns deltas after form validate events" do
+    {:ok, view, _html} = live(build_conn(), "/form")
+    replay_id = :sys.get_state(view.pid).socket.assigns._replay_id
+
+    render_change(view, "validate", %{"name" => "He"})
+    render_change(view, "validate", %{"name" => "Hel"})
+    render_change(view, "validate", %{"name" => "Hello"})
+
+    {:ok, active} = Store.get_active(replay_id)
+
+    event_types = Enum.map(active.events, fn {_t, type, _p} -> type end)
+    assert Enum.count(event_types, &(&1 == :event)) == 3
+
+    assigns_events =
+      active.events
+      |> Enum.filter(fn {_, :assigns, _} -> true; _ -> false end)
+
+    has_name =
+      Enum.any?(assigns_events, fn {_, :assigns, payload} ->
+        name = get_in(payload, [:delta, :name]) || get_in(payload, [:snapshot, :name])
+        name != nil
+      end)
+
+    assert has_name, "Expected at least one assigns entry with :name"
+  end
+
+  test "form assigns are replayable via accumulated_assigns" do
+    alias PhoenixReplay.Recording
+
+    {:ok, view, _html} = live(build_conn(), "/form")
+    replay_id = :sys.get_state(view.pid).socket.assigns._replay_id
+
+    render_change(view, "validate", %{"name" => "Alice"})
+    render_click(view, "submit", %{"name" => "Alice"})
+
+    GenServer.stop(view.pid)
+    Process.sleep(50)
+
+    {:ok, recording} = Store.get_recording(replay_id)
+
+    last_index = length(recording.events) - 1
+    final_assigns = Recording.accumulated_assigns(recording, last_index)
+
+    assert final_assigns[:name] == "Alice"
+    assert final_assigns[:submitted] == true
+  end
+
+  test "accumulated_assigns works with snapshot events" do
+    alias PhoenixReplay.Recording
+
+    recording = %Recording{
+      id: "snap-test",
+      view: SomeLive,
+      url: nil,
+      params: %{},
+      session: %{},
+      connected_at: 0,
+      events: [
+        {0, :mount, %{assigns: %{name: "", count: 0}}},
+        {100, :event, %{name: "validate", params: %{"name" => "A"}}},
+        {200, :event, %{name: "validate", params: %{"name" => "AB"}}},
+        {300, :assigns, %{snapshot: %{name: "AB", count: 0}}},
+        {400, :event, %{name: "inc", params: %{}}},
+        {500, :assigns, %{delta: %{count: 1}}}
+      ]
+    }
+
+    assert Recording.accumulated_assigns(recording, 0) == %{name: "", count: 0}
+    assert Recording.accumulated_assigns(recording, 3) == %{name: "AB", count: 0}
+    assert Recording.accumulated_assigns(recording, 5) == %{name: "AB", count: 1}
   end
 end

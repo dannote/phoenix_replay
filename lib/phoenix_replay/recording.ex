@@ -38,6 +38,7 @@ defmodule PhoenixReplay.Recording do
     |> Enum.take(index + 1)
     |> Enum.reduce(%{}, fn
       {_, :mount, %{assigns: a}}, _acc -> a
+      {_, :assigns, %{snapshot: full}}, _acc -> full
       {_, :assigns, %{delta: delta}}, acc -> Map.merge(acc, delta)
       _, acc -> acc
     end)

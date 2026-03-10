@@ -13,6 +13,7 @@ defmodule PhoenixReplay.TestRouter do
 
     live_session :recorded, on_mount: [PhoenixReplay.Recorder] do
       live("/counter", PhoenixReplay.TestLive.Counter)
+      live("/form", PhoenixReplay.TestLive.Form)
     end
 
     phoenix_replay("/replay")
