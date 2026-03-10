@@ -72,10 +72,19 @@ defmodule PhoenixReplay.StoreTest do
 
   test "list_recordings returns finalized recordings", %{id: id, recording: rec} do
     Store.start_recording(id, rec)
+    Store.append_event(id, {50, :event, %{name: "click", params: %{}}})
     Store.finalize(id)
 
     recordings = Store.list_recordings()
     assert Enum.any?(recordings, &(&1.id == id))
+  end
+
+  test "finalize skips saving recordings with no user events", %{id: id, recording: rec} do
+    Store.start_recording(id, rec)
+    Store.append_event(id, {50, :assigns, %{delta: %{count: 1}}})
+    {:ok, _} = Store.finalize(id)
+
+    assert Store.get_recording(id) == :error
   end
 
   test "auto-finalize on process exit" do

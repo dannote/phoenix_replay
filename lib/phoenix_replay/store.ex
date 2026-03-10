@@ -51,7 +51,10 @@ defmodule PhoenixReplay.Store do
         events = collect_events(id)
         recording = %{recording | events: recording.events ++ events}
 
-        Storage.backend().save(recording, Storage.storage_opts())
+        if has_user_events?(recording) do
+          Storage.backend().save(recording, Storage.storage_opts())
+        end
+
         delete_active(id)
 
         {:ok, recording}
@@ -59,6 +62,11 @@ defmodule PhoenixReplay.Store do
       [] ->
         :error
     end
+  end
+
+  defp has_user_events?(%{events: events}) do
+    Enum.any?(events, fn {_, :event, _} -> true; _ -> false end) or
+      Enum.count(events, fn {_, :handle_params, _} -> true; _ -> false end) > 1
   end
 
   @doc """
