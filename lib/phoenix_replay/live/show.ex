@@ -331,8 +331,8 @@ defmodule PhoenixReplay.Live.Show do
       </div>
 
       <%!-- Events + Assigns (always visible, side by side) --%>
-      <div class="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4">
-        <div class="bg-white rounded-lg border border-neutral-200 flex flex-col min-h-0">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-lg border border-neutral-200 flex flex-col min-h-0 min-w-0">
           <div class="px-4 py-2.5 border-b border-neutral-100 flex items-center justify-between shrink-0">
             <h2 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Events</h2>
             <span class="text-xs text-neutral-400 tabular-nums">{length(@recording.events)}</span>
@@ -360,7 +360,7 @@ defmodule PhoenixReplay.Live.Show do
           </div>
         </div>
 
-        <div class="bg-white rounded-lg border border-neutral-200 flex flex-col min-h-0">
+        <div class="bg-white rounded-lg border border-neutral-200 flex flex-col min-h-0 min-w-0">
           <div class="px-4 py-2.5 border-b border-neutral-100 shrink-0">
             <h2 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Assigns</h2>
           </div>
