@@ -48,7 +48,7 @@ defmodule PhoenixReplay.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      files: ~w(lib mix.exs README.md LICENSE)
+      files: ~w(lib mix.exs README.md LICENSE screenshot.jpg)
     ]
   end
 
