@@ -101,9 +101,7 @@ defmodule PhoenixReplay.SanitizerTest do
     assert compacted.name == "task"
     assert compacted.id == "task"
     assert compacted.action == :validate
-    assert compacted.data == nil
-    assert compacted.hidden == []
-    assert compacted.impl == nil
+    assert compacted.impl == Phoenix.HTML.FormData.Map
     assert compacted.options == []
   end
 

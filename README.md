@@ -79,7 +79,7 @@ Each event includes a millisecond offset from session start.
 
 Sessions with no user interaction (no events, single page view) are discarded automatically.
 
-A 30-second session with active form typing is ~400 events ≈ 150KB in ETF.
+A 30-second session with active form typing is ~400 events ≈ 300KB in ETF.
 Forms and Ecto struct lists are automatically compacted.
 Compare that to rrweb which generates 5–50MB per session.
 

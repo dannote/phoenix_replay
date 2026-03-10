@@ -52,23 +52,20 @@ defmodule PhoenixReplay.Sanitizer do
   end
 
   defp compact(%{__struct__: Phoenix.HTML.Form} = form) do
-    %Phoenix.HTML.Form{
-      source: compact(form.source),
-      params: form.params,
-      errors: form.errors,
-      name: form.name,
-      id: form.id,
-      action: form.action,
-      data: nil,
-      hidden: [],
-      impl: nil,
-      options: [],
-      index: form.index
-    }
+    %{form | source: compact(form.source), data: compact(form.data), options: []}
   end
 
   defp compact(%{__struct__: Ecto.Changeset} = cs) do
-    %{changes: cs.changes, errors: cs.errors, action: cs.action, valid?: cs.valid?}
+    %{
+      cs
+      | data: compact(cs.data),
+        changes: compact(cs.changes),
+        types: nil,
+        validations: [],
+        prepare: [],
+        repo: nil,
+        repo_opts: []
+    }
   end
 
   defp compact(%{__struct__: mod} = struct) do
