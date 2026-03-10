@@ -29,38 +29,9 @@ defmodule PhoenixReplay.Live.Index do
   end
 
   defp list_all do
-    active = active_recordings()
+    active = Store.list_active()
     finished = Store.list_recordings()
     active ++ finished
-  end
-
-  defp active_recordings do
-    self_pid = self()
-
-    Phoenix.LiveView.Debug.list_liveviews()
-    |> Enum.flat_map(fn %{pid: pid} ->
-      if pid == self_pid do
-        []
-      else
-        try do
-          case :sys.get_state(pid, 100) do
-            %{socket: %{assigns: %{_replay_id: id}}} ->
-              case Store.get_active(id) do
-                {:ok, rec} -> [rec]
-                :error -> []
-              end
-
-            _ ->
-              []
-          end
-        rescue
-          _ -> []
-        catch
-          :exit, _ -> []
-        end
-      end
-    end)
-    |> Enum.sort_by(& &1.connected_at, :desc)
   end
 
   defp format_time(ms) when is_integer(ms) do

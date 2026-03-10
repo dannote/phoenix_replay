@@ -335,9 +335,10 @@ defmodule PhoenixReplay.Live.Show do
             <h2 class="text-xs font-medium text-neutral-500 uppercase tracking-wide">Events</h2>
             <span class="text-xs text-neutral-400 tabular-nums">{length(@recording.events)}</span>
           </div>
-          <div class="overflow-y-auto overscroll-contain p-1.5" style="max-height:clamp(300px, 40vh, 600px);">
+          <div id="rp-events" class="overflow-y-auto overscroll-contain p-1.5" style="max-height:clamp(300px, 40vh, 600px);">
             <button
               :for={{event, i} <- Enum.with_index(@recording.events)}
+              id={"rp-ev-#{i}"}
               phx-click="jump"
               phx-value-index={i}
               class={[

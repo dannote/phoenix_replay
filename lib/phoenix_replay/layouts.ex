@@ -227,6 +227,24 @@ defmodule PhoenixReplay.Layouts do
         var ms = events[idx] ? events[idx].ms : 0;
         setThumb(ms);
       });
+
+      /* Auto-scroll active event into view after LiveView DOM patch */
+      function scrollActiveEvent() {
+        var container = getEl("rp-events");
+        if (!container) return;
+        var active = container.querySelector("[class*='bg-neutral-900']");
+        if (active) active.scrollIntoView({ block: "nearest" });
+      }
+
+      var scrollObserver = new MutationObserver(scrollActiveEvent);
+
+      function observeEvents() {
+        var container = getEl("rp-events");
+        if (container) scrollObserver.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+      }
+
+      document.addEventListener("DOMContentLoaded", observeEvents);
+      window.addEventListener("phx:init", observeEvents);
     })();
     """
   end

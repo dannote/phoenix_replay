@@ -113,6 +113,16 @@ defmodule PhoenixReplay.Store do
     end
   end
 
+  @doc """
+  List active recordings that have user interaction, most recent first.
+
+  Uses the monitor registry to enumerate active recording IDs —
+  no `:sys.get_state` calls or private LiveView APIs.
+  """
+  def list_active do
+    GenServer.call(__MODULE__, :list_active)
+  end
+
   defp collect_events(id) do
     match_spec = [{{{id, :"$1"}, :"$2"}, [{:>=, :"$1", 0}], [:"$2"]}]
     :ets.select(@active, match_spec)
@@ -131,6 +141,22 @@ defmodule PhoenixReplay.Store do
     :ets.new(@active, [:named_table, :public, :ordered_set, write_concurrency: true])
     Storage.backend().init(Storage.storage_opts())
     {:ok, %{monitors: %{}}}
+  end
+
+  @impl true
+  def handle_call(:list_active, _from, %{monitors: monitors} = state) do
+    recordings =
+      monitors
+      |> Map.values()
+      |> Enum.flat_map(fn id ->
+        case get_active(id) do
+          {:ok, rec} -> if has_user_events?(rec), do: [rec], else: []
+          :error -> []
+        end
+      end)
+      |> Enum.sort_by(& &1.connected_at, :desc)
+
+    {:reply, recordings, state}
   end
 
   @impl true
