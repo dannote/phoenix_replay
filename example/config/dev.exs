@@ -12,6 +12,7 @@ config :example, ExampleWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4005],
   check_origin: false,
   code_reloader: true,
+  reloadable_apps: [:example, :phoenix_replay],
   debug_errors: true,
   secret_key_base: "B5k/fPcLUFF31abKOAoHjDRW/RVOIq+IKaKVNqGN6Z6i9vLtMnMg8sQjQ0NvS4/S",
   watchers: [
@@ -50,9 +51,12 @@ config :example, ExampleWeb.Endpoint,
       ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
       ~r"lib/example_web/router\.ex$",
       ~r"lib/example_web/(controllers|live|components)/.*\.(ex|heex)$",
-      ~r"../lib/.*(ex|heex)$"
+      ~r"lib/phoenix_replay/.*(ex|heex)$"
     ]
   ]
+
+# Watch parent directory for phoenix_replay path dep changes
+config :phoenix_live_reload, :dirs, ["", ".."]
 
 # Enable dev routes for dashboard and mailbox
 config :example, dev_routes: true

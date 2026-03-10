@@ -101,17 +101,15 @@ defmodule PhoenixReplay.Live.ShowTest do
   test "jump to specific index" do
     {view, _html} = mount_show()
     render_click(view, "jump", %{"index" => "4"})
-    render_click(view, "toggle_events")
     html = render(view)
-    assert html =~ "bg-indigo-600"
+    assert html =~ "bg-neutral-900"
   end
 
   test "scrub by index from scrubber" do
     {view, _html} = mount_show()
     render_click(view, "scrub", %{"index" => "6"})
-    render_click(view, "toggle_events")
     html = render(view)
-    assert html =~ "bg-indigo-600"
+    assert html =~ "bg-neutral-900"
   end
 
   # --- Play / Pause push events ---
@@ -144,29 +142,18 @@ defmodule PhoenixReplay.Live.ShowTest do
 
   # --- Events panel ---
 
-  test "toggle_events shows event list with all event types" do
-    {view, html} = mount_show()
-    refute html =~ "📦 Assigns"
-
-    html = render_click(view, "toggle_events")
-    assert html =~ "📦 Assigns"
+  test "events panel always visible with all event types" do
+    {_view, html} = mount_show()
+    assert html =~ "Assigns"
     assert html =~ "mount"
     assert html =~ "assigns changed"
     assert html =~ "inc"
     assert html =~ "dec"
   end
 
-  test "toggle_events hides when toggled again" do
-    {view, _html} = mount_show()
-    render_click(view, "toggle_events")
-    html = render_click(view, "toggle_events")
-    refute html =~ "📦 Assigns"
-  end
-
   test "events panel shows accumulated assigns" do
     {view, _html} = mount_show()
-    render_click(view, "jump", %{"index" => "5"})
-    html = render_click(view, "toggle_events")
+    html = render_click(view, "jump", %{"index" => "5"})
     assert html =~ "count"
   end
 
@@ -200,8 +187,7 @@ defmodule PhoenixReplay.Live.ShowTest do
 
     PhoenixReplay.Storage.backend().save(recording, PhoenixReplay.Storage.storage_opts())
 
-    {:ok, view, _html} = live(build_conn(), "/replay/test-params-rec")
-    html = render_click(view, "toggle_events")
+    {:ok, view, html} = live(build_conn(), "/replay/test-params-rec")
 
     assert html =~ "validate: title=Hello"
     assert html =~ "validate: description=World"
@@ -210,8 +196,7 @@ defmodule PhoenixReplay.Live.ShowTest do
   end
 
   test "event label handles events without params" do
-    {view, _html} = mount_show()
-    html = render_click(view, "toggle_events")
+    {_view, html} = mount_show()
     assert html =~ "inc"
     assert html =~ "dec"
   end
