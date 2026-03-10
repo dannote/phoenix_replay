@@ -2,6 +2,8 @@
 
 Session recording and replay for Phoenix LiveView — no client-side JS, no rrweb, just BEAM.
 
+Plugs into any LiveView app without touching your code. No changes to LiveViews, templates, or JavaScript — just add a hook to your router and you get full session replay.
+
 ![PhoenixReplay dashboard replaying a form session](screenshot.jpg)
 
 LiveView templates are pure functions: same assigns → same HTML. PhoenixReplay captures assigns at each state transition, so replay is just injecting them back. The database is never consulted.
