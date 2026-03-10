@@ -177,6 +177,45 @@ defmodule PhoenixReplay.Live.ShowTest do
     assert render(view) =~ ~s(data-duration="12100")
   end
 
+  # --- Event labels with params ---
+
+  test "event label shows _target field value for form events" do
+    Store.clear_all()
+
+    recording = %Recording{
+      id: "test-params-rec",
+      view: PhoenixReplay.TestLive.Counter,
+      url: "http://localhost/counter",
+      params: %{},
+      session: %{},
+      connected_at: System.system_time(:millisecond),
+      events: [
+        {0, :mount, %{assigns: %{count: 0}}},
+        {1000, :event, %{name: "validate", params: %{"_target" => ["title"], "title" => "Hello", "priority" => "medium"}}},
+        {2000, :event, %{name: "validate", params: %{"_target" => ["description"], "title" => "Hello", "description" => "World"}}},
+        {3000, :event, %{name: "save", params: %{"title" => "Hello", "description" => "World"}}},
+        {4000, :event, %{name: "delete", params: %{"id" => "42"}}}
+      ]
+    }
+
+    PhoenixReplay.Storage.backend().save(recording, PhoenixReplay.Storage.storage_opts())
+
+    {:ok, view, _html} = live(build_conn(), "/replay/test-params-rec")
+    html = render_click(view, "toggle_events")
+
+    assert html =~ "validate: title=Hello"
+    assert html =~ "validate: description=World"
+    assert html =~ "save: description=World, title=Hello"
+    assert html =~ "delete: id=42"
+  end
+
+  test "event label handles events without params" do
+    {view, _html} = mount_show()
+    html = render_click(view, "toggle_events")
+    assert html =~ "inc"
+    assert html =~ "dec"
+  end
+
   # --- Redirect ---
 
   test "redirects for nonexistent recording" do

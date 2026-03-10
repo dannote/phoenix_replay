@@ -177,12 +177,57 @@ defmodule PhoenixReplay.Live.Show do
   defp event_icon(_), do: "·"
 
   defp event_label({_, :mount, _}), do: "mount"
+
+  defp event_label({_, :event, %{name: name, params: params}}) do
+    summary = params_summary(params)
+    if summary, do: "#{name}: #{summary}", else: name
+  end
+
   defp event_label({_, :event, %{name: name}}), do: name
   defp event_label({_, :handle_params, %{url: url}}), do: "navigate → #{url}"
   defp event_label({_, :handle_params, _}), do: "handle_params"
   defp event_label({_, :info, _}), do: "handle_info"
   defp event_label({_, :assigns, _}), do: "assigns changed"
   defp event_label({_, type, _}), do: to_string(type)
+
+  defp params_summary(%{"_target" => [field | _]} = params) do
+    value = get_in(params, [field]) || nested_value(params, field)
+
+    case value do
+      v when is_binary(v) and v != "" -> "#{field}=#{String.slice(v, 0..39)}"
+      _ -> field
+    end
+  end
+
+  defp params_summary(params) when is_map(params) do
+    params
+    |> Enum.reject(fn {k, _} -> String.starts_with?(k, "_") end)
+    |> Enum.flat_map(fn
+      {_key, nested} when is_map(nested) ->
+        nested
+        |> Enum.filter(fn {_, v} -> is_binary(v) and v != "" end)
+        |> Enum.map(fn {k, v} -> "#{k}=#{String.slice(v, 0..39)}" end)
+
+      {key, value} when is_binary(value) and value != "" ->
+        ["#{key}=#{String.slice(value, 0..39)}"]
+
+      _ ->
+        []
+    end)
+    |> case do
+      [] -> nil
+      parts -> Enum.join(parts, ", ")
+    end
+  end
+
+  defp params_summary(_), do: nil
+
+  defp nested_value(params, field) do
+    Enum.find_value(params, fn
+      {_k, nested} when is_map(nested) -> Map.get(nested, field)
+      _ -> nil
+    end)
+  end
 
   defp marker_color(:mount), do: "#4f46e5"
   defp marker_color(:event), do: "#f59e0b"
