@@ -74,7 +74,13 @@ defmodule ExampleWeb.TaskLive.Index do
   end
 
   def handle_event("validate", params, socket) do
-    changeset = Example.Tasks.Task.changeset(%Example.Tasks.Task{}, params)
+    task =
+      case socket.assigns.live_action do
+        :edit -> %Example.Tasks.Task{id: params["task_id"]}
+        _ -> %Example.Tasks.Task{}
+      end
+
+    changeset = Example.Tasks.Task.changeset(task, params)
     {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
   end
 
