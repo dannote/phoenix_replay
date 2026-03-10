@@ -33,10 +33,20 @@ defmodule PhoenixReplay.Recorder do
 
   @doc """
   Manually attach recording to a socket. Use when not using `on_mount`.
+
+  Pass `params` and `session` from your `mount/3` to capture them in the
+  recording. If omitted, they are recorded as empty maps.
+
+  ## Examples
+
+      def mount(params, session, socket) do
+        {:ok, PhoenixReplay.Recorder.attach(socket, params, session)}
+      end
+
   """
-  def attach(socket) do
+  def attach(socket, params \\ %{}, session \\ %{}) do
     if connected?(socket) do
-      start_and_attach(socket, %{}, %{})
+      start_and_attach(socket, params, session)
     else
       socket
     end

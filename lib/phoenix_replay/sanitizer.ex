@@ -32,8 +32,11 @@ defmodule PhoenixReplay.Sanitizer do
   ]
 
   @doc """
-  Remove internal and sensitive keys from assigns.
-  Returns only the data needed for replay.
+  Remove internal and sensitive keys from assigns, compact structs.
+
+  Drops internal LiveView keys and sensitive fields, then compacts
+  `Phoenix.HTML.Form`, `Ecto.Changeset`, and Ecto schema structs
+  to remove runtime-only data (changeset types, validations, schema metadata).
   """
   def sanitize_assigns(assigns) when is_map(assigns) do
     assigns

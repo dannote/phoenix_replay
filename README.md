@@ -34,8 +34,8 @@ That's it. Every connected LiveView session is now recorded — mount params, ev
 If you don't want to record all views in a live_session:
 
 ```elixir
-def mount(_params, _session, socket) do
-  {:ok, PhoenixReplay.Recorder.attach(socket)}
+def mount(params, session, socket) do
+  {:ok, PhoenixReplay.Recorder.attach(socket, params, session)}
 end
 ```
 
@@ -75,11 +75,11 @@ For each session:
 | Handle event | Event name, params |
 | Handle params | URL, params |
 | Handle info | (type marker only) |
-| After render | Changed assigns (delta only) |
+| After render | Changed assigns (delta, or full snapshot when batched) |
 
 Each event includes a millisecond offset from session start.
 
-Sessions with no user interaction (no events, single page view) are discarded automatically.
+Sessions with no user interaction (no events and no navigation beyond the initial page) are discarded automatically.
 
 A 30-second session with active form typing is ~400 events ≈ 8KB on disk
 (ETF + gzip). Recordings are automatically compressed.
@@ -95,7 +95,7 @@ config :phoenix_replay,
 
 ### Storage backends
 
-Active recordings live in ETS for zero-overhead writes. When a LiveView process exits, the recording is finalized and persisted via the configured storage backend.
+Active recordings live in ETS. Events are appended via pure ETS writes — no GenServer calls on the hot path. When a LiveView process exits, the recording is finalized and persisted via the configured storage backend.
 
 #### File (default)
 
@@ -144,18 +144,29 @@ Both backends support `:etf` (Erlang Term Format, default — fast, compact, pre
 
 ### Custom sanitizer
 
-The default sanitizer strips `__changed__`, `flash`, `uploads`, `streams`, `csrf_token`, `password`, `token`, `secret`, and other sensitive fields. To customize:
+The default sanitizer strips internal LiveView keys (`__changed__`, `flash`,
+`uploads`, `streams`, `_replay_id`, `_replay_t0`) and sensitive fields
+(`csrf_token`, `current_password`, `password`, `password_confirmation`,
+`token`, `secret`). It also compacts `Phoenix.HTML.Form`, `Ecto.Changeset`,
+and Ecto schema structs to remove runtime-only data.
+
+To customize, implement `sanitize_assigns/1` and `sanitize_delta/2`:
 
 ```elixir
 defmodule MyApp.ReplaySanitizer do
+  @drop [:__changed__, :flash, :uploads, :streams,
+         :_replay_id, :_replay_t0, :csrf_token, :password,
+         :current_password, :password_confirmation, :token, :secret,
+         :my_custom_secret]
+
   def sanitize_assigns(assigns) do
-    Map.drop(assigns, [:__changed__, :flash, :secret_field])
+    Map.drop(assigns, @drop)
   end
 
   def sanitize_delta(changed, assigns) do
     changed
     |> Map.keys()
-    |> Enum.reject(&(&1 in [:__changed__, :flash, :secret_field]))
+    |> Enum.reject(&(&1 in @drop))
     |> Map.new(fn key -> {key, Map.get(assigns, key)} end)
   end
 end
@@ -164,11 +175,9 @@ end
 ## How it works
 
 1. An `on_mount` hook attaches lifecycle hooks to each connected LiveView
-2. Events are written directly to ETS (`ordered_set` with `write_concurrency`) — zero backpressure on the LiveView process
-3. The Store GenServer monitors each LiveView PID and auto-finalizes the recording on process exit
-4. Finalized recordings are persisted via the configured storage backend
-
-No messages are sent during recording. The LiveView process writes to ETS and continues immediately.
+2. Session start sends a single async cast to the Store GenServer (to set up a process monitor)
+3. All subsequent events are written directly to ETS (`ordered_set` with `write_concurrency`) — no messages, no GenServer calls on the hot path
+4. When the LiveView process exits, the Store auto-finalizes and persists via the configured storage backend
 
 ## Roadmap
 

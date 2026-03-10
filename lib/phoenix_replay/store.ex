@@ -3,7 +3,7 @@ defmodule PhoenixReplay.Store do
   Manages active recordings in ETS and delegates persistence to the
   configured `PhoenixReplay.Storage` backend.
 
-  Active (in-flight) recordings live in ETS for zero-overhead writes.
+  Events are appended via pure ETS writes — no GenServer call on the hot path.
   When a LiveView process exits, the recording is finalized and persisted.
   """
 
@@ -44,6 +44,9 @@ defmodule PhoenixReplay.Store do
 
   @doc """
   Finalize a recording — collect events from ETS, persist via the storage backend.
+
+  Recordings with no user events (no `handle_event`, at most one `handle_params`)
+  are silently discarded to avoid storing empty page views.
   """
   def finalize(id) do
     case :ets.lookup(@active, {id, @metadata_key}) do
