@@ -73,12 +73,17 @@ Replay is currently based on root LiveView assigns. It does not fully reconstruc
 ```elixir
 config :phoenix_replay,
   max_events: 10_000,
-  sanitizer: MyApp.ReplaySanitizer
+  sanitizer: MyApp.ReplaySanitizer,
+  max_recordings: 1_000,
+  max_recording_age_ms: 7 * 24 * 60 * 60 * 1000,
+  cleanup_interval_ms: 60 * 60 * 1000,
+  persistence_retry_attempts: 3,
+  persistence_retry_delay_ms: 1_000
 ```
 
 ### Storage backends
 
-Active recordings live in ETS. When a LiveView process exits, the recording is persisted via the configured backend.
+Active recordings live in ETS. When a LiveView process exits, the recording is persisted via the configured backend. Async persistence retries transient failures using `:persistence_retry_attempts` and `:persistence_retry_delay_ms`; cleanup can be limited by `:max_recordings`, `:max_recording_age_ms`, and `:cleanup_interval_ms`.
 
 **File (default):**
 
@@ -157,6 +162,9 @@ PhoenixReplay.Store.list_recording_summaries()
 PhoenixReplay.Store.list_recordings()
 PhoenixReplay.Store.get_recording(id)
 PhoenixReplay.Store.get_active(id)
+PhoenixReplay.Store.delete_recording(id)
+PhoenixReplay.Store.clear_all()
+PhoenixReplay.Store.cleanup()
 ```
 
 ## Roadmap

@@ -2,7 +2,7 @@ defmodule PhoenixReplay.Live.Show do
   @moduledoc false
   use Phoenix.LiveView
 
-  alias PhoenixReplay.{Recording, Recordings}
+  alias PhoenixReplay.{Recording, Recordings, Store}
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -90,6 +90,11 @@ defmodule PhoenixReplay.Live.Show do
 
   def handle_event("playback_ended", _, socket) do
     {:noreply, assign(socket, :playing, false)}
+  end
+
+  def handle_event("delete", _params, socket) do
+    Store.delete_recording(socket.assigns.recording.id)
+    {:noreply, push_navigate(socket, to: socket.assigns.base_path)}
   end
 
   def handle_event("speed", %{"speed" => speed}, socket) do
@@ -244,7 +249,10 @@ defmodule PhoenixReplay.Live.Show do
     <div class="max-w-6xl mx-auto px-4 py-6">
       <%!-- Header --%>
       <div class="mb-4">
-        <.link navigate={@base_path} class="text-sm text-neutral-500 hover:text-neutral-800 transition-colors">← Recordings</.link>
+        <div class="flex items-center justify-between gap-3">
+          <.link navigate={@base_path} class="text-sm text-neutral-500 hover:text-neutral-800 transition-colors">← Recordings</.link>
+          <button phx-click="delete" class="px-2 py-1 rounded border border-red-200 text-xs text-red-700 hover:bg-red-50">Delete recording</button>
+        </div>
         <h1 class="text-xl font-semibold mt-1 text-pretty">{inspect(@recording.view)}</h1>
         <p class="text-sm text-neutral-500 tabular-nums">
           Session <code class="font-mono text-neutral-600">{String.slice(@recording.id, 0..11)}</code>

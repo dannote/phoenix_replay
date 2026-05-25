@@ -40,6 +40,8 @@ defmodule PhoenixReplay.MixProject do
       {:phoenix_live_view, "~> 1.0"},
       {:jason, "~> 1.0"},
       {:ecto, "~> 3.13", optional: true},
+      {:ecto_sql, "~> 3.13", only: :test},
+      {:ecto_sqlite3, "~> 0.22", only: :test},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -54,7 +56,7 @@ defmodule PhoenixReplay.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE screenshot.jpg)
+      files: ~w(lib priv mix.exs README.md CHANGELOG.md LICENSE screenshot.jpg)
     ]
   end
 

@@ -143,6 +143,10 @@ defmodule PhoenixReplay.Store do
     Persistence.storage_call(:clear, [Storage.storage_opts()], :ok)
   end
 
+  def delete_recording(id) do
+    Persistence.storage_call(:delete, [id, Storage.storage_opts()], :ok)
+  end
+
   @doc """
   List all finalized recordings, most recent first.
   """
@@ -204,6 +208,21 @@ defmodule PhoenixReplay.Store do
     GenServer.cast(__MODULE__, {:persisted, id})
   end
 
+  def cleanup do
+    summaries = list_recording_summaries()
+    now = System.system_time(:millisecond)
+
+    summaries
+    |> expired_summaries(now)
+    |> Enum.each(&delete_recording(&1.id))
+
+    :ok
+  end
+
+  def cleanup_async do
+    GenServer.cast(__MODULE__, :cleanup)
+  end
+
   def authorize_recording(recording) do
     authorize = Application.get_env(:phoenix_replay, :authorize, fn _recording -> true end)
 
@@ -223,6 +242,32 @@ defmodule PhoenixReplay.Store do
 
   defp authorized_summary?(summary) do
     match?({:ok, _}, summary |> summary_recording() |> authorize_recording())
+  end
+
+  defp expired_summaries(summaries, now) do
+    by_age =
+      case Application.get_env(:phoenix_replay, :max_recording_age_ms) do
+        age when is_integer(age) and age > 0 ->
+          Enum.filter(summaries, &(now - &1.connected_at > age))
+
+        _ ->
+          []
+      end
+
+    by_count =
+      case Application.get_env(:phoenix_replay, :max_recordings) do
+        max when is_integer(max) and max >= 0 ->
+          summaries
+          |> Enum.sort_by(& &1.connected_at, :desc)
+          |> Enum.drop(max)
+
+        _ ->
+          []
+      end
+
+    (by_age ++ by_count)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.reject(& &1.active?)
   end
 
   defp summary_recording(summary) do
@@ -249,6 +294,10 @@ defmodule PhoenixReplay.Store do
 
       {:error, reason} ->
         Logger.error("PhoenixReplay: storage initialization failed: #{inspect(reason)}")
+    end
+
+    if interval = Application.get_env(:phoenix_replay, :cleanup_interval_ms) do
+      :timer.send_interval(interval, :cleanup)
     end
 
     {:ok, %{monitors: %{}}}
@@ -299,6 +348,17 @@ defmodule PhoenixReplay.Store do
   end
 
   @impl true
+  def handle_cast(:cleanup, state) do
+    cleanup()
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(:cleanup, state) do
+    cleanup()
+    {:noreply, state}
+  end
+
   def handle_info({:DOWN, ref, :process, _pid, _reason}, %{monitors: monitors} = state) do
     case Map.pop(monitors, ref) do
       {nil, _} ->

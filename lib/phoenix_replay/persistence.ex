@@ -16,7 +16,7 @@ defmodule PhoenixReplay.Persistence do
   end
 
   def save_async(recording) do
-    GenServer.cast(__MODULE__, {:save, recording})
+    GenServer.cast(__MODULE__, {:save, recording, 1})
   end
 
   @impl true
@@ -30,15 +30,28 @@ defmodule PhoenixReplay.Persistence do
   end
 
   @impl true
-  def handle_cast({:save, recording}, state) do
+  def handle_cast({:save, recording, attempt}, state) do
     case persist(recording) do
       :ok ->
         PhoenixReplay.Store.persisted(recording.id)
+        PhoenixReplay.Store.cleanup_async()
 
       {:error, reason} ->
-        Logger.error(
-          "PhoenixReplay: failed to persist recording #{recording.id}: #{inspect(reason)}"
-        )
+        retry_or_log(recording, attempt, reason)
+    end
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:retry_save, recording, attempt}, state) do
+    case persist(recording) do
+      :ok ->
+        PhoenixReplay.Store.persisted(recording.id)
+        PhoenixReplay.Store.cleanup_async()
+
+      {:error, reason} ->
+        retry_or_log(recording, attempt, reason)
     end
 
     {:noreply, state}
@@ -74,5 +87,22 @@ defmodule PhoenixReplay.Persistence do
 
   defp persist(recording) do
     storage_call(:save, [recording, Storage.storage_opts()], {:error, :storage_unavailable})
+  end
+
+  defp retry_or_log(recording, attempt, reason) do
+    max_attempts = Application.get_env(:phoenix_replay, :persistence_retry_attempts, 3)
+
+    if attempt < max_attempts do
+      Process.send_after(self(), {:retry_save, recording, attempt + 1}, retry_delay(attempt))
+    else
+      Logger.error(
+        "PhoenixReplay: failed to persist recording #{recording.id}: #{inspect(reason)}"
+      )
+    end
+  end
+
+  defp retry_delay(attempt) do
+    base = Application.get_env(:phoenix_replay, :persistence_retry_delay_ms, 1000)
+    base * attempt
   end
 end

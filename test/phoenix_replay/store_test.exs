@@ -103,6 +103,65 @@ defmodule PhoenixReplay.StoreTest do
     assert Enum.any?(summaries, &(&1.id == id and &1.event_count == 2))
   end
 
+  test "cleanup removes recordings past max count", %{recording: rec} do
+    original_max = Application.get_env(:phoenix_replay, :max_recordings)
+    original_age = Application.get_env(:phoenix_replay, :max_recording_age_ms)
+    original_authorize = Application.get_env(:phoenix_replay, :authorize)
+
+    on_exit(fn ->
+      restore_env(:max_recordings, original_max)
+      restore_env(:max_recording_age_ms, original_age)
+      restore_env(:authorize, original_authorize)
+    end)
+
+    Application.delete_env(:phoenix_replay, :max_recording_age_ms)
+
+    Application.put_env(:phoenix_replay, :authorize, fn recording ->
+      recording.id in ["old", "new"]
+    end)
+
+    Store.clear_all()
+
+    for {id, connected_at} <- [{"old", 1000}, {"new", 2000}] do
+      rec = %{rec | id: id, connected_at: connected_at}
+      Store.start_recording(id, rec)
+      Store.append_event(id, {50, :event, %{name: "click", params: %{}}})
+      Store.finalize(id)
+    end
+
+    Application.put_env(:phoenix_replay, :max_recordings, 1)
+    assert :ok = Store.cleanup()
+
+    assert Store.get_recording("old") == :error
+    assert {:ok, _} = Store.get_recording("new")
+  end
+
+  test "cleanup removes recordings past max age", %{recording: rec} do
+    original_age = Application.get_env(:phoenix_replay, :max_recording_age_ms)
+    original_max = Application.get_env(:phoenix_replay, :max_recordings)
+    original_authorize = Application.get_env(:phoenix_replay, :authorize)
+
+    on_exit(fn ->
+      restore_env(:max_recording_age_ms, original_age)
+      restore_env(:max_recordings, original_max)
+      restore_env(:authorize, original_authorize)
+    end)
+
+    Application.delete_env(:phoenix_replay, :max_recordings)
+
+    Application.put_env(:phoenix_replay, :authorize, fn recording -> recording.id == "too-old" end)
+
+    old = %{rec | id: "too-old", connected_at: 1}
+    Store.start_recording(old.id, old)
+    Store.append_event(old.id, {50, :event, %{name: "click", params: %{}}})
+    Store.finalize(old.id)
+
+    Application.put_env(:phoenix_replay, :max_recording_age_ms, 1)
+    assert :ok = Store.cleanup()
+
+    assert Store.get_recording("too-old") == :error
+  end
+
   test "authorization filters recordings", %{id: id, recording: rec} do
     original_authorize = Application.get_env(:phoenix_replay, :authorize)
 
@@ -187,4 +246,7 @@ defmodule PhoenixReplay.StoreTest do
     recording = TestSupport.assert_eventually(fn -> Store.get_recording(id) end)
     assert length(recording.events) == 2
   end
+
+  defp restore_env(key, nil), do: Application.delete_env(:phoenix_replay, key)
+  defp restore_env(key, value), do: Application.put_env(:phoenix_replay, key, value)
 end
