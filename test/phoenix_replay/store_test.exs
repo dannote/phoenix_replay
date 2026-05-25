@@ -3,6 +3,17 @@ defmodule PhoenixReplay.StoreTest do
 
   alias PhoenixReplay.{Recording, Store}
 
+  defmodule FailingStorage do
+    @behaviour PhoenixReplay.Storage
+
+    def init(_opts), do: :ok
+    def save(_recording, _opts), do: {:error, :failed}
+    def get(_id, _opts), do: :error
+    def list(_opts), do: []
+    def delete(_id, _opts), do: :ok
+    def clear(_opts), do: :ok
+  end
+
   setup do
     id = Base.url_encode64(:crypto.strong_rand_bytes(8), padding: false)
 
@@ -85,6 +96,27 @@ defmodule PhoenixReplay.StoreTest do
     {:ok, _} = Store.finalize(id)
 
     assert Store.get_recording(id) == :error
+  end
+
+  test "finalize keeps active recording when persistence fails", %{id: id, recording: rec} do
+    original_storage = Application.get_env(:phoenix_replay, :storage)
+
+    on_exit(fn ->
+      if original_storage do
+        Application.put_env(:phoenix_replay, :storage, original_storage)
+      else
+        Application.delete_env(:phoenix_replay, :storage)
+      end
+    end)
+
+    Application.put_env(:phoenix_replay, :storage, FailingStorage)
+
+    Store.start_recording(id, rec)
+    Store.append_event(id, {50, :event, %{name: "click", params: %{}}})
+
+    assert {:error, :failed} = Store.finalize(id)
+    assert {:ok, active} = Store.get_active(id)
+    assert active.id == id
   end
 
   test "auto-finalize on process exit" do

@@ -61,8 +61,8 @@ defmodule PhoenixReplay.Recorder do
       id: id,
       view: socket.view,
       url: get_url(socket),
-      params: params,
-      session: sanitizer.sanitize_assigns(session),
+      params: sanitize_params(sanitizer, params),
+      session: sanitize_params(sanitizer, session),
       connected_at: System.system_time(:millisecond),
       events: [
         {0, :mount, %{assigns: sanitizer.sanitize_assigns(socket.assigns)}}
@@ -82,12 +82,14 @@ defmodule PhoenixReplay.Recorder do
 
   defp handle_event_hook(event, params, socket) do
     bump_pending_events(socket)
-    record(socket, :event, %{name: event, params: params})
+    sanitizer = sanitizer_mod()
+    record(socket, :event, %{name: event, params: sanitize_params(sanitizer, params)})
     {:cont, socket}
   end
 
   defp handle_params_hook(params, url, socket) do
-    record(socket, :handle_params, %{params: params, url: url})
+    sanitizer = sanitizer_mod()
+    record(socket, :handle_params, %{params: sanitize_params(sanitizer, params), url: url})
     {:cont, socket}
   end
 
@@ -150,6 +152,14 @@ defmodule PhoenixReplay.Recorder do
 
   defp generate_id do
     Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
+  end
+
+  defp sanitize_params(sanitizer, params) do
+    if function_exported?(sanitizer, :sanitize_params, 1) do
+      sanitizer.sanitize_params(params)
+    else
+      sanitizer.sanitize_assigns(params)
+    end
   end
 
   defp sanitizer_mod do

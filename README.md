@@ -36,7 +36,7 @@ scope "/" do
 end
 ```
 
-Visit `/replay` to browse recordings and replay sessions with a scrubber, play/pause, and speed controls. Every connected LiveView in the live session is recorded automatically — mount params, events, navigation, and assign deltas. Sessions with no user interaction are discarded.
+Visit `/replay` to browse recordings and replay sessions with a scrubber, play/pause, and speed controls. Every connected LiveView in the live session is recorded automatically — sanitized mount params, events, navigation, and assign deltas. Sessions with no user interaction are discarded.
 
 ## How it works
 
@@ -55,7 +55,7 @@ Visit `/replay` to browse recordings and replay sessions with a scrubber, play/p
 | Handle info | Type marker only |
 | After render | Changed assigns (delta, or full snapshot when batched) |
 
-Each event includes a millisecond offset from session start.
+Each event includes a millisecond offset from session start. Current replay is based on root LiveView assigns; stateful LiveComponents, streams, uploads, client-only JavaScript state, and pushed JS events are not fully reconstructed yet.
 
 ## Configuration
 
@@ -118,6 +118,7 @@ defmodule MyApp.ReplaySanitizer do
          :my_custom_secret]
 
   def sanitize_assigns(assigns), do: Map.drop(assigns, @drop)
+  def sanitize_params(params), do: Map.drop(params, Enum.map(@drop, &Atom.to_string/1))
 
   def sanitize_delta(changed, assigns) do
     changed

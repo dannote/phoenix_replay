@@ -53,6 +53,24 @@ defmodule PhoenixReplay.RecorderTest do
     assert html_response(conn, 200) =~ "count"
   end
 
+  test "sanitizes recorded event params" do
+    {:ok, view, _html} = live(build_conn(), "/form")
+    replay_id = :sys.get_state(view.pid).socket.assigns._replay_id
+
+    render_change(view, "validate", %{
+      "name" => "Alice",
+      "password" => "secret",
+      "profile" => %{"token" => "nested"}
+    })
+
+    {:ok, active} = Store.get_active(replay_id)
+    {_, :event, payload} = Enum.find(active.events, &match?({_, :event, _}, &1))
+
+    refute Map.has_key?(payload.params, "password")
+    refute Map.has_key?(payload.params["profile"], "token")
+    assert payload.params["name"] == "Alice"
+  end
+
   test "records assigns delta with intermediate values for each keystroke" do
     {:ok, view, _html} = live(build_conn(), "/form")
     replay_id = :sys.get_state(view.pid).socket.assigns._replay_id

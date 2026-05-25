@@ -21,6 +21,10 @@ defmodule PhoenixReplay.MixProject do
     ]
   end
 
+  def cli do
+    [preferred_envs: [ci: :test]]
+  end
+
   def application do
     [
       extra_applications: [:logger],
@@ -34,7 +38,8 @@ defmodule PhoenixReplay.MixProject do
   defp deps do
     [
       {:phoenix_live_view, "~> 1.0"},
-      {:jason, "~> 1.0", only: [:dev, :test]},
+      {:jason, "~> 1.0"},
+      {:ecto, "~> 3.13", optional: true},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -66,6 +71,7 @@ defmodule PhoenixReplay.MixProject do
       ci: [
         "compile --warnings-as-errors",
         "format --check-formatted",
+        "test",
         "credo --strict",
         "ex_dna",
         "reach.check --smells --strict",

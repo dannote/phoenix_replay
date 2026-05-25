@@ -27,6 +27,7 @@ defmodule PhoenixReplay.Live.Frame do
      socket
      |> assign(:_recording, recording)
      |> assign(:_current_index, index)
+     |> assign(:_recorded_assign_keys, MapSet.new())
      |> inject_assigns(assigns), layout: false}
   end
 
@@ -91,8 +92,22 @@ defmodule PhoenixReplay.Live.Frame do
   end
 
   defp inject_assigns(socket, recorded_assigns) do
-    Enum.reduce(recorded_assigns, socket, fn {key, value}, sock ->
-      Phoenix.Component.assign(sock, key, value)
+    previous_keys = socket.assigns[:_recorded_assign_keys] || MapSet.new()
+    next_keys = recorded_assigns |> Map.keys() |> MapSet.new()
+
+    socket
+    |> clear_stale_assigns(MapSet.difference(previous_keys, next_keys))
+    |> assign(:_recorded_assign_keys, next_keys)
+    |> then(fn sock ->
+      Enum.reduce(recorded_assigns, sock, fn {key, value}, acc ->
+        Phoenix.Component.assign(acc, key, value)
+      end)
+    end)
+  end
+
+  defp clear_stale_assigns(socket, keys) do
+    Enum.reduce(keys, socket, fn key, acc ->
+      Phoenix.Component.assign(acc, key, nil)
     end)
   end
 
@@ -104,6 +119,14 @@ defmodule PhoenixReplay.Live.Frame do
   end
 
   defp parse_index(nil), do: 0
-  defp parse_index(val) when is_binary(val), do: String.to_integer(val)
+
+  defp parse_index(val) when is_binary(val) do
+    case Integer.parse(val) do
+      {int, ""} -> int
+      _ -> 0
+    end
+  end
+
   defp parse_index(val) when is_integer(val), do: val
+  defp parse_index(_val), do: 0
 end

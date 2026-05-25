@@ -195,7 +195,7 @@ defmodule PhoenixReplay.Live.ShowTest do
 
     PhoenixReplay.Storage.backend().save(recording, PhoenixReplay.Storage.storage_opts())
 
-    {:ok, view, html} = live(build_conn(), "/replay/test-params-rec")
+    {:ok, _view, html} = live(build_conn(), "/replay/test-params-rec")
 
     assert html =~ "validate: title=Hello"
     assert html =~ "validate: description=World"

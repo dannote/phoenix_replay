@@ -65,17 +65,17 @@ defmodule PhoenixReplay.Live.Show do
   end
 
   def handle_event("jump", %{"index" => index}, socket) do
-    jump_to(socket, String.to_integer(index))
+    jump_to(socket, parse_integer(index, socket.assigns.current_index))
   end
 
   def handle_event("tick", %{"index" => index}, socket) do
-    idx = clamp_index(socket, String.to_integer(index))
+    idx = clamp_index(socket, parse_integer(index, socket.assigns.current_index))
     broadcast_jump(socket.assigns.recording.id, idx)
     {:noreply, assign(socket, :current_index, idx)}
   end
 
   def handle_event("scrub", %{"index" => index}, socket) do
-    idx = clamp_index(socket, String.to_integer(index))
+    idx = clamp_index(socket, parse_integer(index, socket.assigns.current_index))
     broadcast_jump(socket.assigns.recording.id, idx)
 
     {:noreply,
@@ -103,7 +103,7 @@ defmodule PhoenixReplay.Live.Show do
   end
 
   def handle_event("speed", %{"speed" => speed}, socket) do
-    speed = String.to_integer(speed)
+    speed = speed |> parse_integer(socket.assigns.speed) |> normalize_speed()
 
     {:noreply,
      socket
@@ -128,6 +128,20 @@ defmodule PhoenixReplay.Live.Show do
     max = length(socket.assigns.recording.events) - 1
     max(0, min(index, max))
   end
+
+  defp parse_integer(value, _default) when is_integer(value), do: value
+
+  defp parse_integer(value, default) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} -> int
+      _ -> default
+    end
+  end
+
+  defp parse_integer(_value, default), do: default
+
+  defp normalize_speed(speed) when speed in [1, 2, 5, 10], do: speed
+  defp normalize_speed(_speed), do: 1
 
   defp broadcast_jump(recording_id, index) do
     Phoenix.PubSub.broadcast(

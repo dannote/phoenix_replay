@@ -38,6 +38,27 @@ defmodule PhoenixReplay.SanitizerTest do
     assert result.name == "Dan"
   end
 
+  test "sanitize_params strips nested string sensitive keys" do
+    params = %{
+      "_csrf_token" => "csrf",
+      "user" => %{
+        "email" => "dan@example.com",
+        "password" => "secret",
+        "profile" => %{"token" => "nested"}
+      },
+      "items" => [%{"secret" => "hidden", "name" => "visible"}]
+    }
+
+    result = Sanitizer.sanitize_params(params)
+
+    refute Map.has_key?(result, "_csrf_token")
+    refute Map.has_key?(result["user"], "password")
+    refute Map.has_key?(result["user"]["profile"], "token")
+    refute Map.has_key?(hd(result["items"]), "secret")
+    assert result["user"]["email"] == "dan@example.com"
+    assert hd(result["items"])["name"] == "visible"
+  end
+
   test "sanitize_assigns strips replay internal keys" do
     assigns = %{
       _replay_id: "abc123",

@@ -9,6 +9,8 @@ defmodule PhoenixReplay.Store do
 
   use GenServer
 
+  require Logger
+
   alias PhoenixReplay.Storage
 
   @active __MODULE__.Active
@@ -37,8 +39,15 @@ defmodule PhoenixReplay.Store do
     max = Application.get_env(:phoenix_replay, :max_events, 10_000)
 
     if counter < max do
-      :ets.insert(@active, {{id, counter}, event})
-      Process.put(:phoenix_replay_counter, counter + 1)
+      case :ets.whereis(@active) do
+        :undefined ->
+          Logger.warning("PhoenixReplay: active recording table is unavailable")
+          :error
+
+        _table ->
+          :ets.insert(@active, {{id, counter}, event})
+          Process.put(:phoenix_replay_counter, counter + 1)
+      end
     end
   end
 
@@ -55,12 +64,19 @@ defmodule PhoenixReplay.Store do
         recording = %{recording | events: recording.events ++ events}
 
         if has_user_events?(recording) do
-          Storage.backend().save(recording, Storage.storage_opts())
+          case save_recording(recording) do
+            :ok ->
+              delete_active(id)
+              {:ok, recording}
+
+            {:error, reason} ->
+              Logger.error("PhoenixReplay: failed to persist recording #{id}: #{inspect(reason)}")
+              {:error, reason}
+          end
+        else
+          delete_active(id)
+          {:ok, recording}
         end
-
-        delete_active(id)
-
-        {:ok, recording}
 
       [] ->
         :error
@@ -90,21 +106,21 @@ defmodule PhoenixReplay.Store do
   Get a finalized recording by ID from the storage backend.
   """
   def get_recording(id) do
-    Storage.backend().get(id, Storage.storage_opts())
+    safe_storage_call(:get, [id, Storage.storage_opts()], :error)
   end
 
   @doc """
   Delete all finalized recordings. Useful in tests.
   """
   def clear_all do
-    Storage.backend().clear(Storage.storage_opts())
+    safe_storage_call(:clear, [Storage.storage_opts()], :ok)
   end
 
   @doc """
   List all finalized recordings, most recent first.
   """
   def list_recordings do
-    Storage.backend().list(Storage.storage_opts())
+    safe_storage_call(:list, [Storage.storage_opts()], [])
   end
 
   @doc """
@@ -142,12 +158,48 @@ defmodule PhoenixReplay.Store do
     :ets.select_delete(@active, match_spec)
   end
 
+  defp save_recording(recording) do
+    safe_storage_call(:save, [recording, Storage.storage_opts()], {:error, :storage_unavailable})
+  end
+
+  defp safe_storage_call(function, args, fallback) do
+    apply(Storage.backend(), function, args)
+  rescue
+    e in [
+      ArgumentError,
+      ErlangError,
+      File.Error,
+      FunctionClauseError,
+      KeyError,
+      MatchError,
+      RuntimeError,
+      UndefinedFunctionError
+    ] ->
+      Logger.error(
+        "PhoenixReplay: storage #{function} failed: #{Exception.format(:error, e, __STACKTRACE__)}"
+      )
+
+      fallback
+  catch
+    kind, reason ->
+      Logger.error("PhoenixReplay: storage #{function} failed: #{inspect({kind, reason})}")
+      fallback
+  end
+
   # --- GenServer callbacks ---
 
   @impl true
   def init(_) do
     :ets.new(@active, [:named_table, :public, :ordered_set, write_concurrency: true])
-    Storage.backend().init(Storage.storage_opts())
+
+    case safe_storage_call(:init, [Storage.storage_opts()], {:error, :storage_unavailable}) do
+      :ok ->
+        Logger.debug("PhoenixReplay: storage initialized")
+
+      {:error, reason} ->
+        Logger.error("PhoenixReplay: storage initialization failed: #{inspect(reason)}")
+    end
+
     {:ok, %{monitors: %{}}}
   end
 
@@ -180,7 +232,17 @@ defmodule PhoenixReplay.Store do
         {:noreply, state}
 
       {id, monitors} ->
-        finalize(id)
+        case finalize(id) do
+          {:ok, _recording} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.error("PhoenixReplay: recording #{id} was not finalized: #{inspect(reason)}")
+
+          :error ->
+            :ok
+        end
+
         {:noreply, %{state | monitors: monitors}}
     end
   end
