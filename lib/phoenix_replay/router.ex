@@ -23,6 +23,8 @@ defmodule PhoenixReplay.Router do
       scope path, alias: false, as: false do
         import Phoenix.LiveView.Router, only: [live: 4, live_session: 3]
 
+        get("/player.js", PhoenixReplay.Assets, :player_js)
+
         live_session :phoenix_replay,
           root_layout: {PhoenixReplay.Layouts, :root} do
           live("/", PhoenixReplay.Live.Index, :index, as: :replay_index)

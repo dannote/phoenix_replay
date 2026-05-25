@@ -5,6 +5,7 @@ defmodule PhoenixReplay.RecorderTest do
   import Phoenix.LiveViewTest
 
   alias PhoenixReplay.Store
+  alias PhoenixReplay.TestSupport
 
   @endpoint PhoenixReplay.TestEndpoint
 
@@ -30,9 +31,8 @@ defmodule PhoenixReplay.RecorderTest do
 
     # Kill the LiveView — should auto-finalize
     GenServer.stop(view.pid)
-    Process.sleep(50)
 
-    {:ok, recording} = Store.get_recording(replay_id)
+    recording = TestSupport.assert_eventually(fn -> Store.get_recording(replay_id) end)
     assert recording.id == replay_id
     assert length(recording.events) > 0
 
@@ -111,9 +111,8 @@ defmodule PhoenixReplay.RecorderTest do
     render_click(view, "submit", %{"name" => "Alice"})
 
     GenServer.stop(view.pid)
-    Process.sleep(50)
 
-    {:ok, recording} = Store.get_recording(replay_id)
+    recording = TestSupport.assert_eventually(fn -> Store.get_recording(replay_id) end)
 
     validate_indices =
       recording.events

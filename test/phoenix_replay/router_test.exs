@@ -4,6 +4,11 @@ defmodule PhoenixReplay.RouterTest do
   test "phoenix_replay macro mounts dashboard routes" do
     routes = PhoenixReplay.TestRouter.__routes__()
 
+    assert Enum.any?(
+             routes,
+             &(&1.path == "/replay/player.js" and &1.plug == PhoenixReplay.Assets)
+           )
+
     assert live_route?(routes, "/replay", PhoenixReplay.Live.Index)
     assert live_route?(routes, "/replay/:id", PhoenixReplay.Live.Show)
     assert live_route?(routes, "/replay/:id/frame", PhoenixReplay.Live.Frame)

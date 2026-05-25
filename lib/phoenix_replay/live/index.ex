@@ -2,7 +2,7 @@ defmodule PhoenixReplay.Live.Index do
   @moduledoc false
   use Phoenix.LiveView
 
-  alias PhoenixReplay.Store
+  alias PhoenixReplay.Recordings
 
   @impl true
   def mount(_params, _session, socket) do
@@ -29,21 +29,15 @@ defmodule PhoenixReplay.Live.Index do
   end
 
   defp list_all do
-    active = Store.list_active()
-    finished = Store.list_recordings()
-    active ++ finished
+    Recordings.list_summaries()
   end
 
   defp format_time(ms) when is_integer(ms) do
     DateTime.from_unix!(ms, :millisecond) |> Calendar.strftime("%H:%M:%S")
   end
 
-  defp duration_ms(recording) do
-    case List.last(recording.events) do
-      {offset, _, _} -> offset
-      nil -> 0
-    end
-  end
+  defp duration_ms(%{duration_ms: nil}), do: 0
+  defp duration_ms(%{duration_ms: ms}) when is_integer(ms), do: ms
 
   defp format_duration(ms) do
     seconds = div(ms, 1000)
@@ -53,9 +47,7 @@ defmodule PhoenixReplay.Live.Index do
     if minutes > 0, do: "#{minutes}m #{secs}s", else: "#{secs}s"
   end
 
-  defp active?(recording) do
-    match?({:ok, _}, Store.get_active(recording.id))
-  end
+  defp active?(recording), do: recording.active?
 
   @impl true
   def render(assigns) do
@@ -91,7 +83,7 @@ defmodule PhoenixReplay.Live.Index do
             </div>
             <div class="text-sm text-neutral-500 mt-1">
               Started at {format_time(rec.connected_at)}
-              · {length(rec.events)} events
+              · {rec.event_count} events
               · {format_duration(duration_ms(rec))}
             </div>
           </div>

@@ -2,6 +2,7 @@ defmodule PhoenixReplay.StoreTest do
   use ExUnit.Case, async: false
 
   alias PhoenixReplay.{Recording, Store}
+  alias PhoenixReplay.TestSupport
 
   defmodule FailingStorage do
     @behaviour PhoenixReplay.Storage
@@ -90,6 +91,39 @@ defmodule PhoenixReplay.StoreTest do
     assert Enum.any?(recordings, &(&1.id == id))
   end
 
+  test "list_recording_summaries returns lightweight finalized recordings", %{
+    id: id,
+    recording: rec
+  } do
+    Store.start_recording(id, rec)
+    Store.append_event(id, {50, :event, %{name: "click", params: %{}}})
+    Store.finalize(id)
+
+    summaries = Store.list_recording_summaries()
+    assert Enum.any?(summaries, &(&1.id == id and &1.event_count == 2))
+  end
+
+  test "authorization filters recordings", %{id: id, recording: rec} do
+    original_authorize = Application.get_env(:phoenix_replay, :authorize)
+
+    on_exit(fn ->
+      if original_authorize do
+        Application.put_env(:phoenix_replay, :authorize, original_authorize)
+      else
+        Application.delete_env(:phoenix_replay, :authorize)
+      end
+    end)
+
+    Store.start_recording(id, rec)
+    Store.append_event(id, {50, :event, %{name: "click", params: %{}}})
+    Store.finalize(id)
+
+    Application.put_env(:phoenix_replay, :authorize, fn recording -> recording.id != id end)
+
+    assert Store.get_recording(id) == :error
+    refute Enum.any?(Store.list_recording_summaries(), &(&1.id == id))
+  end
+
   test "finalize skips saving recordings with no user events", %{id: id, recording: rec} do
     Store.start_recording(id, rec)
     Store.append_event(id, {50, :assigns, %{delta: %{count: 1}}})
@@ -150,10 +184,7 @@ defmodule PhoenixReplay.StoreTest do
     send(pid, :exit)
     assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
 
-    # Give the Store time to handle the :DOWN message
-    Process.sleep(50)
-
-    assert {:ok, recording} = Store.get_recording(id)
+    recording = TestSupport.assert_eventually(fn -> Store.get_recording(id) end)
     assert length(recording.events) == 2
   end
 end

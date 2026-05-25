@@ -11,7 +11,7 @@ defmodule PhoenixReplay.Store do
 
   require Logger
 
-  alias PhoenixReplay.Storage
+  alias PhoenixReplay.{Persistence, Recordings, Storage}
 
   @active __MODULE__.Active
   @metadata_key -1
@@ -58,28 +58,52 @@ defmodule PhoenixReplay.Store do
   are silently discarded to avoid storing empty page views.
   """
   def finalize(id) do
+    case finalized_recording(id) do
+      {:ok, recording} -> persist_finalized(recording, sync?: true)
+      :error -> :error
+    end
+  end
+
+  defp finalize_async(id) do
+    case finalized_recording(id) do
+      {:ok, recording} -> persist_finalized(recording, sync?: false)
+      :error -> :error
+    end
+  end
+
+  defp finalized_recording(id) do
     case :ets.lookup(@active, {id, @metadata_key}) do
       [{{^id, @metadata_key}, recording}] ->
         events = collect_events(id)
-        recording = %{recording | events: recording.events ++ events}
-
-        if has_user_events?(recording) do
-          case save_recording(recording) do
-            :ok ->
-              delete_active(id)
-              {:ok, recording}
-
-            {:error, reason} ->
-              Logger.error("PhoenixReplay: failed to persist recording #{id}: #{inspect(reason)}")
-              {:error, reason}
-          end
-        else
-          delete_active(id)
-          {:ok, recording}
-        end
+        {:ok, %{recording | events: recording.events ++ events}}
 
       [] ->
         :error
+    end
+  end
+
+  defp persist_finalized(recording, sync?: sync?) do
+    if has_user_events?(recording) do
+      if sync? do
+        case Persistence.save(recording) do
+          :ok ->
+            delete_active(recording.id)
+            {:ok, recording}
+
+          {:error, reason} ->
+            Logger.error(
+              "PhoenixReplay: failed to persist recording #{recording.id}: #{inspect(reason)}"
+            )
+
+            {:error, reason}
+        end
+      else
+        Persistence.save_async(recording)
+        {:ok, recording}
+      end
+    else
+      delete_active(recording.id)
+      {:ok, recording}
     end
   end
 
@@ -106,21 +130,45 @@ defmodule PhoenixReplay.Store do
   Get a finalized recording by ID from the storage backend.
   """
   def get_recording(id) do
-    safe_storage_call(:get, [id, Storage.storage_opts()], :error)
+    case Persistence.storage_call(:get, [id, Storage.storage_opts()], :error) do
+      {:ok, recording} -> authorize_recording(recording)
+      :error -> :error
+    end
   end
 
   @doc """
   Delete all finalized recordings. Useful in tests.
   """
   def clear_all do
-    safe_storage_call(:clear, [Storage.storage_opts()], :ok)
+    Persistence.storage_call(:clear, [Storage.storage_opts()], :ok)
   end
 
   @doc """
   List all finalized recordings, most recent first.
   """
   def list_recordings do
-    safe_storage_call(:list, [Storage.storage_opts()], [])
+    :list
+    |> Persistence.storage_call([Storage.storage_opts()], [])
+    |> Enum.flat_map(fn recording ->
+      case authorize_recording(recording) do
+        {:ok, recording} -> [recording]
+        :error -> []
+      end
+    end)
+  end
+
+  @doc """
+  List all finalized recording summaries, most recent first.
+  """
+  def list_recording_summaries do
+    summaries =
+      if function_exported?(Storage.backend(), :list_summaries, 1) do
+        Persistence.storage_call(:list_summaries, [Storage.storage_opts()], [])
+      else
+        Enum.map(list_recordings(), &Recordings.summary/1)
+      end
+
+    Enum.filter(summaries, &authorized_summary?/1)
   end
 
   @doc """
@@ -130,7 +178,8 @@ defmodule PhoenixReplay.Store do
     case :ets.lookup(@active, {id, @metadata_key}) do
       [{{^id, @metadata_key}, recording}] ->
         events = collect_events(id)
-        {:ok, %{recording | events: recording.events ++ events}}
+        recording = %{recording | events: recording.events ++ events}
+        authorize_recording(recording)
 
       [] ->
         :error
@@ -147,6 +196,20 @@ defmodule PhoenixReplay.Store do
     GenServer.call(__MODULE__, :list_active)
   end
 
+  def list_active_summaries do
+    GenServer.call(__MODULE__, :list_active_summaries)
+  end
+
+  def persisted(id) do
+    GenServer.cast(__MODULE__, {:persisted, id})
+  end
+
+  def authorize_recording(recording) do
+    authorize = Application.get_env(:phoenix_replay, :authorize, fn _recording -> true end)
+
+    if authorize.(recording), do: {:ok, recording}, else: :error
+  end
+
   defp collect_events(id) do
     match_spec = [{{{id, :"$1"}, :"$2"}, [{:>=, :"$1", 0}], [:"$2"]}]
     :ets.select(@active, match_spec)
@@ -158,32 +221,20 @@ defmodule PhoenixReplay.Store do
     :ets.select_delete(@active, match_spec)
   end
 
-  defp save_recording(recording) do
-    safe_storage_call(:save, [recording, Storage.storage_opts()], {:error, :storage_unavailable})
+  defp authorized_summary?(summary) do
+    match?({:ok, _}, summary |> summary_recording() |> authorize_recording())
   end
 
-  defp safe_storage_call(function, args, fallback) do
-    apply(Storage.backend(), function, args)
-  rescue
-    e in [
-      ArgumentError,
-      ErlangError,
-      File.Error,
-      FunctionClauseError,
-      KeyError,
-      MatchError,
-      RuntimeError,
-      UndefinedFunctionError
-    ] ->
-      Logger.error(
-        "PhoenixReplay: storage #{function} failed: #{Exception.format(:error, e, __STACKTRACE__)}"
-      )
-
-      fallback
-  catch
-    kind, reason ->
-      Logger.error("PhoenixReplay: storage #{function} failed: #{inspect({kind, reason})}")
-      fallback
+  defp summary_recording(summary) do
+    %PhoenixReplay.Recording{
+      id: summary.id,
+      view: summary.view,
+      url: summary.url,
+      params: %{},
+      session: %{},
+      connected_at: summary.connected_at,
+      events: []
+    }
   end
 
   # --- GenServer callbacks ---
@@ -192,7 +243,7 @@ defmodule PhoenixReplay.Store do
   def init(_) do
     :ets.new(@active, [:named_table, :public, :ordered_set, write_concurrency: true])
 
-    case safe_storage_call(:init, [Storage.storage_opts()], {:error, :storage_unavailable}) do
+    case Persistence.init_storage() do
       :ok ->
         Logger.debug("PhoenixReplay: storage initialized")
 
@@ -220,9 +271,31 @@ defmodule PhoenixReplay.Store do
   end
 
   @impl true
+  def handle_call(:list_active_summaries, _from, %{monitors: monitors} = state) do
+    summaries =
+      monitors
+      |> Map.values()
+      |> Enum.flat_map(fn id ->
+        case get_active(id) do
+          {:ok, rec} -> if has_user_events?(rec), do: [Recordings.active_summary(rec)], else: []
+          :error -> []
+        end
+      end)
+      |> Enum.sort_by(& &1.connected_at, :desc)
+
+    {:reply, summaries, state}
+  end
+
+  @impl true
   def handle_cast({:monitor, pid, id}, %{monitors: monitors} = state) do
     ref = Process.monitor(pid)
     {:noreply, %{state | monitors: Map.put(monitors, ref, id)}}
+  end
+
+  @impl true
+  def handle_cast({:persisted, id}, state) do
+    delete_active(id)
+    {:noreply, state}
   end
 
   @impl true
@@ -232,7 +305,7 @@ defmodule PhoenixReplay.Store do
         {:noreply, state}
 
       {id, monitors} ->
-        case finalize(id) do
+        case finalize_async(id) do
           {:ok, _recording} ->
             :ok
 

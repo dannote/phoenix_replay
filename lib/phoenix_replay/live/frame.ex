@@ -9,11 +9,11 @@ defmodule PhoenixReplay.Live.Frame do
 
   use Phoenix.LiveView
 
-  alias PhoenixReplay.{Recording, Store}
+  alias PhoenixReplay.{Recording, Recordings}
 
   @impl true
   def mount(%{"id" => id} = params, _session, socket) do
-    recording = fetch_recording!(id)
+    recording = Recordings.fetch!(id)
     index = parse_index(params["index"])
     index = max(index, first_renderable_index(recording))
 
@@ -75,19 +75,6 @@ defmodule PhoenixReplay.Live.Frame do
           <p style="font-size:0.875rem;">Some assigns may be missing for this event.</p>
         </div>
         """
-    end
-  end
-
-  defp fetch_recording!(id) do
-    case Store.get_recording(id) do
-      {:ok, rec} ->
-        rec
-
-      :error ->
-        case Store.get_active(id) do
-          {:ok, rec} -> rec
-          :error -> raise "Recording not found: #{id}"
-        end
     end
   end
 

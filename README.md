@@ -31,19 +31,26 @@ Mount the replay dashboard:
 import PhoenixReplay.Router
 
 scope "/" do
-  pipe_through :browser
+  pipe_through [:browser, :require_admin]
   phoenix_replay "/replay"
 end
 ```
 
 Visit `/replay` to browse recordings and replay sessions with a scrubber, play/pause, and speed controls. Every connected LiveView in the live session is recorded automatically — sanitized mount params, events, navigation, and assign deltas. Sessions with no user interaction are discarded.
 
+Recordings can contain business data even after sanitization. Mount the dashboard only behind an authenticated admin pipeline. You can also add a final authorization callback:
+
+```elixir
+config :phoenix_replay,
+  authorize: fn recording -> recording.view in [MyAppWeb.SafeLive] end
+```
+
 ## How it works
 
 1. The `on_mount` hook attaches lifecycle hooks to each connected LiveView.
 2. Session start sends a single async cast to the Store GenServer to set up a process monitor.
 3. All subsequent events are written directly to ETS (`ordered_set` with `write_concurrency`) — no GenServer messages on the hot path.
-4. When the LiveView process exits, the Store finalizes and persists the recording via the configured storage backend.
+4. When the LiveView process exits, the Store finalizes the recording and hands persistence to a supervised worker.
 
 ### Recorded events
 
@@ -55,7 +62,11 @@ Visit `/replay` to browse recordings and replay sessions with a scrubber, play/p
 | Handle info | Type marker only |
 | After render | Changed assigns (delta, or full snapshot when batched) |
 
-Each event includes a millisecond offset from session start. Current replay is based on root LiveView assigns; stateful LiveComponents, streams, uploads, client-only JavaScript state, and pushed JS events are not fully reconstructed yet.
+Each event includes a millisecond offset from session start.
+
+### Current limitations
+
+Replay is currently based on root LiveView assigns. It does not fully reconstruct stateful LiveComponents, streams, uploads, client-only JavaScript state, or pushed JS events. Those sessions may still be useful for debugging server-side state, but replay output can differ from what the browser showed.
 
 ## Configuration
 
@@ -142,6 +153,7 @@ end
 ## Programmatic access
 
 ```elixir
+PhoenixReplay.Store.list_recording_summaries()
 PhoenixReplay.Store.list_recordings()
 PhoenixReplay.Store.get_recording(id)
 PhoenixReplay.Store.get_active(id)

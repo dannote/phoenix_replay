@@ -44,6 +44,11 @@ defmodule PhoenixReplay.Storage do
   @doc "List all recordings, most recent first."
   @callback list(opts()) :: [Recording.t()]
 
+  @doc "List lightweight recording summaries, most recent first."
+  @callback list_summaries(opts()) :: [map()]
+
+  @optional_callbacks list_summaries: 1
+
   @doc "Delete a recording by ID."
   @callback delete(binary(), opts()) :: :ok | {:error, term()}
 

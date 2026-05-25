@@ -63,6 +63,21 @@ defmodule PhoenixReplay.Storage.FileTest do
         assert Enum.map(recs, & &1.id) == ["b", "c", "a"]
       end
 
+      test "list_summaries returns lightweight recording metadata", context do
+        dir = tmp_dir(context)
+        opts = [path: dir, format: @format]
+        FileStorage.init(opts)
+
+        FileStorage.save(%{sample_recording("a") | connected_at: 1000}, opts)
+        FileStorage.save(%{sample_recording("b") | connected_at: 3000}, opts)
+
+        summaries = FileStorage.list_summaries(opts)
+
+        assert Enum.map(summaries, & &1.id) == ["b", "a"]
+        assert hd(summaries).event_count == 3
+        refute Map.has_key?(hd(summaries), :events)
+      end
+
       test "get returns :error for missing id", context do
         dir = tmp_dir(context)
         opts = [path: dir, format: @format]

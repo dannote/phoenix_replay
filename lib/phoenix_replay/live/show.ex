@@ -2,29 +2,19 @@ defmodule PhoenixReplay.Live.Show do
   @moduledoc false
   use Phoenix.LiveView
 
-  alias PhoenixReplay.{Recording, Store}
+  alias PhoenixReplay.{Recording, Recordings}
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     recording =
-      case Store.get_recording(id) do
-        {:ok, rec} ->
-          rec
-
-        :error ->
-          case Store.get_active(id) do
-            {:ok, rec} -> rec
-            :error -> nil
-          end
+      case Recordings.fetch(id) do
+        {:ok, rec} -> rec
+        :error -> nil
       end
 
     if recording do
-      duration_ms = total_duration(recording)
-
-      event_offsets =
-        recording.events
-        |> Enum.with_index()
-        |> Enum.map(fn {{ms, _, _}, i} -> %{ms: ms, index: i} end)
+      duration_ms = Recordings.total_duration(recording)
+      event_offsets = Recordings.event_offsets(recording)
 
       {:ok,
        socket
@@ -161,13 +151,6 @@ defmodule PhoenixReplay.Live.Show do
     end
   end
 
-  defp total_duration(%{events: []}), do: 0
-
-  defp total_duration(%{events: events}) do
-    {ms, _, _} = List.last(events)
-    ms
-  end
-
   defp last_event_index(%{events: []}), do: 0
   defp last_event_index(%{events: events}), do: length(events) - 1
 
@@ -257,6 +240,7 @@ defmodule PhoenixReplay.Live.Show do
   @impl true
   def render(assigns) do
     ~H"""
+    <script defer type="text/javascript" src={"#{@base_path}/player.js"}></script>
     <div class="max-w-6xl mx-auto px-4 py-6">
       <%!-- Header --%>
       <div class="mb-4">

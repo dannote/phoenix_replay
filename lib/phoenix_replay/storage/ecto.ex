@@ -89,8 +89,34 @@ if Code.ensure_loaded?(Ecto) do
       |> Enum.flat_map(fn data ->
         case Serializer.decode(decompress(data), format(opts)) do
           {:ok, recording} -> [recording]
-          :error -> []
+          {:error, _reason} -> []
         end
+      end)
+    end
+
+    @impl true
+    def list_summaries(opts) do
+      query =
+        from(r in table(),
+          order_by: [desc: r.connected_at],
+          select: %{
+            id: r.id,
+            view: r.view,
+            connected_at: r.connected_at,
+            event_count: r.event_count
+          }
+        )
+
+      Enum.map(repo(opts).all(query), fn summary ->
+        %{
+          id: summary.id,
+          view: module_from_string(summary.view),
+          url: nil,
+          connected_at: summary.connected_at,
+          event_count: summary.event_count,
+          duration_ms: nil,
+          active?: false
+        }
       end)
     end
 
@@ -105,6 +131,14 @@ if Code.ensure_loaded?(Ecto) do
     def clear(opts) do
       repo(opts).delete_all(from(r in table()))
       :ok
+    end
+
+    defp module_from_string(name) when is_binary(name) do
+      name
+      |> String.trim_leading("Elixir.")
+      |> then(&String.to_existing_atom("Elixir." <> &1))
+    rescue
+      _ in [ArgumentError] -> name
     end
 
     defp decompress(<<0x1F, 0x8B, _rest::binary>> = data), do: :zlib.gunzip(data)

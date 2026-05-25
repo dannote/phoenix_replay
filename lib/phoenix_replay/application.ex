@@ -6,7 +6,8 @@ defmodule PhoenixReplay.Application do
   def start(_type, _args) do
     children = [
       {Phoenix.PubSub, name: PhoenixReplay.PubSub},
-      PhoenixReplay.Store
+      PhoenixReplay.Store,
+      PhoenixReplay.Persistence
     ]
 
     opts = [strategy: :one_for_one, name: PhoenixReplay.Supervisor]

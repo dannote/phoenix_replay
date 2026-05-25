@@ -3,6 +3,7 @@ defmodule PhoenixReplay.ApplicationTest do
 
   test "starts supervised store and pubsub processes" do
     assert Process.whereis(PhoenixReplay.Store)
+    assert Process.whereis(PhoenixReplay.Persistence)
     assert Process.whereis(PhoenixReplay.PubSub)
   end
 end

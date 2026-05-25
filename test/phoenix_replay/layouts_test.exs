@@ -3,11 +3,11 @@ defmodule PhoenixReplay.LayoutsTest do
 
   import Phoenix.LiveViewTest
 
-  test "root layout includes replay player script" do
+  test "root layout includes app assets" do
     html = rendered_to_string(PhoenixReplay.Layouts.root(%{inner_content: "content"}))
 
     assert html =~ "PhoenixReplay"
-    assert html =~ "phx:init"
+    assert html =~ "/assets/js/app.js"
     assert html =~ "content"
   end
 

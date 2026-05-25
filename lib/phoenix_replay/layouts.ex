@@ -37,9 +37,6 @@ defmodule PhoenixReplay.Layouts do
 
         <script defer type="text/javascript" src="/assets/js/app.js">
         </script>
-        <script>
-          <%= Phoenix.HTML.raw(PhoenixReplay.Layouts.player_js()) %>
-        </script>
       </head>
       <body class="m-0 font-sans bg-neutral-100 text-neutral-900 antialiased">
         {@inner_content}

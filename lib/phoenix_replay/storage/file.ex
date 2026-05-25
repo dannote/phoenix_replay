@@ -64,6 +64,13 @@ defmodule PhoenixReplay.Storage.File do
   end
 
   @impl true
+  def list_summaries(opts) do
+    opts
+    |> list()
+    |> Enum.map(&PhoenixReplay.Recordings.summary/1)
+  end
+
+  @impl true
   def delete(id, opts) do
     path = file_path(id, opts)
     legacy = legacy_path(id, opts)
