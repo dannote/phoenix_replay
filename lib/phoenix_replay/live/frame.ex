@@ -53,7 +53,15 @@ defmodule PhoenixReplay.Live.Frame do
     try do
       view.render(assigns)
     rescue
-      e ->
+      e in [
+        ArgumentError,
+        FunctionClauseError,
+        KeyError,
+        MatchError,
+        Protocol.UndefinedError,
+        RuntimeError,
+        UndefinedFunctionError
+      ] ->
         require Logger
 
         Logger.warning(

@@ -162,8 +162,8 @@ defmodule PhoenixReplay.Live.Show do
   defp event_markers(events, duration_ms) do
     events
     |> Enum.with_index()
-    |> Enum.map(fn {{ms, type, _}, i} ->
-      %{index: i, type: type, pct: ms / duration_ms * 100}
+    |> Enum.map(fn {{ms, type, _} = event, i} ->
+      %{index: i, type: type, pct: ms / duration_ms * 100, label: event_label(event)}
     end)
   end
 
@@ -297,7 +297,7 @@ defmodule PhoenixReplay.Live.Show do
               :for={m <- event_markers(@recording.events, @duration_ms)}
               class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
               style={"left:#{m.pct}%;"}
-              title={event_label(Enum.at(@recording.events, m.index))}
+              title={m.label}
             >
               <div class={[
                 "rounded-full",

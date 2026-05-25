@@ -18,7 +18,7 @@ defmodule PhoenixReplay.Storage.Serializer do
   def decode(binary, :etf) do
     {:ok, binary |> :erlang.binary_to_term([:safe]) |> from_map()}
   rescue
-    e -> {:error, e}
+    e in [ArgumentError] -> {:error, e}
   end
 
   def decode(binary, :json) do
@@ -116,6 +116,6 @@ defmodule PhoenixReplay.Storage.Serializer do
     name = String.trim_leading(name, "Elixir.")
     String.to_existing_atom("Elixir." <> name)
   rescue
-    _ -> name
+    _ in [ArgumentError] -> name
   end
 end

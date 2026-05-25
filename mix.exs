@@ -40,7 +40,8 @@ defmodule PhoenixReplay.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.1", only: [:dev, :test], runtime: false},
-      {:ex_slop, "~> 0.2.0", only: [:dev, :test], runtime: false}
+      {:ex_slop, "~> 0.2.0", only: [:dev, :test], runtime: false},
+      {:reach, "~> 2.7", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -67,6 +68,7 @@ defmodule PhoenixReplay.MixProject do
         "format --check-formatted",
         "credo --strict",
         "ex_dna",
+        "reach.check --smells --strict",
         "dialyzer",
         "deps.unlock --check-unused"
       ]

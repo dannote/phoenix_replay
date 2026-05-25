@@ -54,10 +54,7 @@ defmodule PhoenixReplay.Live.Index do
   end
 
   defp active?(recording) do
-    case Store.get_active(recording.id) do
-      {:ok, _} -> true
-      :error -> false
-    end
+    match?({:ok, _}, Store.get_active(recording.id))
   end
 
   @impl true

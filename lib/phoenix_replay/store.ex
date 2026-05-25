@@ -68,14 +68,22 @@ defmodule PhoenixReplay.Store do
   end
 
   defp has_user_events?(%{events: events}) do
-    Enum.any?(events, fn
-      {_, :event, _} -> true
-      _ -> false
-    end) or
-      Enum.count(events, fn
-        {_, :handle_params, _} -> true
-        _ -> false
-      end) > 1
+    Enum.reduce_while(events, 0, fn
+      {_, :event, _}, _handle_params_count ->
+        {:halt, true}
+
+      {_, :handle_params, _}, handle_params_count ->
+        handle_params_count = handle_params_count + 1
+
+        if handle_params_count > 1 do
+          {:halt, true}
+        else
+          {:cont, handle_params_count}
+        end
+
+      _, handle_params_count ->
+        {:cont, handle_params_count}
+    end) == true
   end
 
   @doc """
