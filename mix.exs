@@ -2,7 +2,7 @@ defmodule PhoenixReplay.MixProject do
   use Mix.Project
 
   @version "0.1.1"
-  @source_url "https://github.com/dannote/phoenix_replay"
+  @source_url "https://github.com/elixir-vibe/phoenix_replay"
 
   def project do
     [
